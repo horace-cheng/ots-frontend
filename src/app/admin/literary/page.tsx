@@ -18,10 +18,12 @@ export default function LiteraryPage() {
   const [editors,     setEditors]     = useState<Record<string, string>>({})
   const [proofreaders,setProofreaders]= useState<Record<string, string>>({})
   const [saving,      setSaving]      = useState<Record<string, boolean>>({})
+  const [tick,        setTick]        = useState(0)
 
   useEffect(() => {
+    setBusy(true)
     listAssignments().then(setAssignments).finally(() => setBusy(false))
-  }, [])
+  }, [tick])
 
   async function handleAssign(orderId: string) {
     const editor_id      = editors[orderId]?.trim() || undefined
@@ -41,7 +43,15 @@ export default function LiteraryPage() {
     <div className="space-y-4 fade-up">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">Literary Track 指派</h1>
-        <span className="text-xs text-mist">{assignments.length} 筆</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-mist">{assignments.length} 筆</span>
+          <button onClick={() => setTick(t => t + 1)} disabled={busy}
+            className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors">
+            <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {busy ? (

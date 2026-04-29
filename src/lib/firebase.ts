@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app'
 import {
-  getAuth, signInWithEmailAndPassword, signOut,
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
   onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup
 } from 'firebase/auth'
 
@@ -16,6 +16,10 @@ export const auth = getAuth(app)
 
 export async function loginWithEmail(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password)
+}
+
+export async function registerWithEmail(email: string, password: string) {
+  return createUserWithEmailAndPassword(auth, email, password)
 }
 
 export async function loginWithGoogle() {
