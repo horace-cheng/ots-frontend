@@ -82,12 +82,10 @@ gcloud run deploy ots-frontend \
   --set-env-vars="NEXT_PUBLIC_API_URL=...,NEXT_PUBLIC_FIREBASE_API_KEY=..."
 ```
 
-### 3. CI/CD Pipeline Flow (GitHub Actions)
-For an automated CI/CD pipeline, the recommended approach is to use **GitHub Actions** connected to **Google Cloud Artifact Registry** and **Cloud Run**.
+### 3. Automated CI/CD Pipeline (Google Cloud Build)
+For an automated CI/CD pipeline, this repository includes a `cloudbuild.yaml` configuration file natively integrated with **Google Cloud Build**.
 
-A typical CI/CD workflow (`.github/workflows/deploy.yml`) operates as follows:
-1. **Trigger**: A developer pushes code or merges a PR to the `main` branch.
-2. **Auth**: GitHub Actions authenticates to GCP securely using Workload Identity Federation.
-3. **Build**: Docker builds the Next.js standalone container using the provided `Dockerfile`.
-4. **Publish**: The resulting image is pushed to GCP Artifact Registry.
-5. **Deploy**: `gcloud run deploy` updates the `ots-frontend` service with the new image, shifting traffic immediately with zero downtime.
+When you connect this repository to a Cloud Build Trigger, the workflow operates automatically on every push to the `main` branch:
+1. **Build**: Cloud Build uses `cloudbuild.yaml` to build the Next.js standalone container using the `Dockerfile`.
+2. **Publish**: The resulting Docker image is pushed and tagged securely in **Google Artifact Registry**.
+3. **Deploy**: Cloud Build executes `gcloud run deploy` to update the `ots-frontend` service with the new image, shifting traffic immediately with zero downtime.
