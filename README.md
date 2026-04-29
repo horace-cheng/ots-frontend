@@ -58,3 +58,36 @@ Make sure you have Node.js (v20+) and npm installed.
 ## Authentication Architecture
 
 This frontend interfaces directly with **GCP Identity Platform (via the Firebase SDK)** to provide centralized Single Sign-On (SSO). This SSO token is used securely to communicate with the `ots-api` backend services, as well as providing future interoperability with other OTS services (e.g., Thinkific, WooCommerce, Open edX).
+
+## Deployment (Cloud Run CI/CD)
+
+This application is designed to be deployed as a highly scalable containerized application to **Google Cloud Run**, utilizing Next.js's optimized `standalone` output mode.
+
+### 1. Build Optimization
+In `next.config.js`, we have enabled `output: 'standalone'`. This automatically traces all imports and drastically reduces the final Docker image size by excluding unused dependencies in `node_modules`.
+
+### 2. Manual Deployment
+To manually deploy the frontend to Cloud Run using the Google Cloud CLI:
+
+```bash
+# 1. Ensure you are authenticated with GCP
+gcloud auth login
+gcloud config set project ots-translation
+
+# 2. Deploy directly from source (Cloud Build handles the Dockerfile automatically)
+gcloud run deploy ots-frontend \
+  --source . \
+  --region asia-east1 \
+  --allow-unauthenticated \
+  --set-env-vars="NEXT_PUBLIC_API_URL=...,NEXT_PUBLIC_FIREBASE_API_KEY=..."
+```
+
+### 3. CI/CD Pipeline Flow (GitHub Actions)
+For an automated CI/CD pipeline, the recommended approach is to use **GitHub Actions** connected to **Google Cloud Artifact Registry** and **Cloud Run**.
+
+A typical CI/CD workflow (`.github/workflows/deploy.yml`) operates as follows:
+1. **Trigger**: A developer pushes code or merges a PR to the `main` branch.
+2. **Auth**: GitHub Actions authenticates to GCP securely using Workload Identity Federation.
+3. **Build**: Docker builds the Next.js standalone container using the provided `Dockerfile`.
+4. **Publish**: The resulting image is pushed to GCP Artifact Registry.
+5. **Deploy**: `gcloud run deploy` updates the `ots-frontend` service with the new image, shifting traffic immediately with zero downtime.
