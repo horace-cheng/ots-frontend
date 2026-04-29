@@ -4,9 +4,11 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend:$COMMIT_SHA'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:$COMMIT_SHA'
       - '-t'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend:latest'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:latest'
+      - '-e'
+      - 'NODE_ENV=$_ENV'
       - '.'
 
   # 2. Push the image to Google Artifact Registry
@@ -24,7 +26,7 @@ steps:
       - 'deploy'
       - 'ots-frontend-$_ENV'
       - '--image'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend:$COMMIT_SHA'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:$COMMIT_SHA'
       - '--region'
       - 'asia-east1'
       - '--allow-unauthenticated'
@@ -35,8 +37,8 @@ steps:
       - '--set-env-vars=NEXT_PUBLIC_FIREBASE_APP_ID=$_NEXT_PUBLIC_FIREBASE_APP_ID'
 
 images:
-  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend:$COMMIT_SHA'
-  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend:latest'
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:$COMMIT_SHA'
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
