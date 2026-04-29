@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter, Link } from '@/i18n/routing'
 import { resetPassword } from '@/lib/firebase'
 import { PortalHeader } from '@/components/portal/header'
 

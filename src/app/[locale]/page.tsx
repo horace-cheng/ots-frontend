@@ -1,10 +1,10 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter, Link } from '@/i18n/routing'
 import { PortalHeader } from '@/components/portal/header'
 import { useAuth } from '@/lib/auth-context'
 import { createOrder, getUploadUrl, uploadFile, confirmUpload } from '@/lib/api'
+import { useTranslations } from 'next-intl'
 
 const LANG_OPTIONS = [
   { value: 'tai-lo',     label: '台語（台羅拼音）' },
@@ -38,6 +38,7 @@ async function readFileText(file: File): Promise<string> {
 export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const t = useTranslations('Home')
   const [form, setForm]     = useState({ track_type: 'fast', source_lang: 'tai-lo', target_lang: 'en', title: '', notes: '' })
   const [wordCount, setWordCount] = useState(0)
   const [file, setFile]     = useState<File | null>(null)
@@ -101,10 +102,10 @@ export default function HomePage() {
         <div className="page-container">
           <p style={{ fontSize: '0.7rem', letterSpacing: '0.15em', color: 'var(--gold)', textTransform: 'uppercase', marginBottom: '1rem' }}>Original Tale Studio</p>
           <h1 className="font-display" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3, marginBottom: '0.75rem' }}>
-            台灣文學的<span style={{ color: 'var(--gold)' }}>跨語言橋樑</span>
+            {t('title')}<span style={{ color: 'var(--gold)' }}>{t('titleHighlight')}</span>
           </h1>
           <p style={{ color: 'var(--mist)', maxWidth: 480, margin: '0 auto 1.5rem', lineHeight: 1.7 }}>
-            台語・客語・原住民族語 AI 輔助翻譯，由語言學家與文學編輯共同守護文化精髓
+            {t('subtitle')}
           </p>
         </div>
       </div>
@@ -234,7 +235,7 @@ export default function HomePage() {
                 </button>
               ) : (
                 <Link href="/login" className="btn btn-primary" style={{ width: '100%', padding: '0.7rem', textAlign: 'center' }}>
-                  登入後下單
+                  {t('loginToOrder')}
                 </Link>
               )}
             </form>

@@ -1,12 +1,13 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter, Link } from '@/i18n/routing'
 import { loginWithEmail, loginWithGoogle } from '@/lib/firebase'
 import { PortalHeader } from '@/components/portal/header'
+import { useTranslations } from 'next-intl'
 
 export default function LoginPage() {
   const router = useRouter()
+  const t = useTranslations('Login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
@@ -38,22 +39,22 @@ export default function LoginPage() {
       <PortalHeader />
       <div className="mx-auto max-w-sm px-4 pt-20 pb-16 fade-up">
         <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold text-ink mb-2">登入</h1>
-          <p className="text-sm text-mist">木典翻譯服務平台</p>
+          <h1 className="font-display text-3xl font-bold text-ink mb-2">{t('title')}</h1>
+          <p className="text-sm text-mist">{t('subtitle')}</p>
         </div>
 
         <div className="card space-y-4">
           <form onSubmit={handleEmail} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-ink/60 mb-1">Email</label>
+              <label className="block text-xs font-medium text-ink/60 mb-1">{t('emailLabel')}</label>
               <input type="email" required placeholder="you@example.com"
                 className="field" value={email}
                 onChange={e => setEmail(e.target.value)} />
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-xs font-medium text-ink/60">密碼</label>
-                <Link href="/forgot-password" className="text-xs text-gold hover:underline">忘記密碼？</Link>
+                <label className="block text-xs font-medium text-ink/60">{t('passwordLabel')}</label>
+                <Link href="/forgot-password" className="text-xs text-gold hover:underline">{t('forgotPassword')}</Link>
               </div>
               <input type="password" required placeholder="••••••••"
                 className="field" value={password}
@@ -61,13 +62,13 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-xs text-coral">{error}</p>}
             <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
-              {busy ? '登入中…' : '登入'}
+              {busy ? t('loggingIn') : t('loginButton')}
             </button>
           </form>
 
           <div className="relative">
             <hr className="ink-rule" />
-            <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-2 text-xs text-mist">或</span>
+            <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-2 text-xs text-mist">{t('or')}</span>
           </div>
 
           <button onClick={handleGoogle} disabled={busy}
@@ -78,16 +79,16 @@ export default function LoginPage() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            Google 登入
+            {t('googleLogin')}
           </button>
         </div>
 
         <p className="text-center text-xs text-mist mt-6">
-          尚未有帳號？{' '}
-          <Link href="/register" className="text-gold hover:underline">立即註冊</Link>
+          {t('noAccount')}{' '}
+          <Link href="/register" className="text-gold hover:underline">{t('registerNow')}</Link>
         </p>
         <p className="text-center text-xs text-mist mt-2">
-          <Link href="/admin/login" className="hover:text-gold transition-colors">後台管理員入口</Link>
+          <Link href="/admin/login" className="hover:text-gold transition-colors">{t('adminLogin')}</Link>
         </p>
       </div>
     </div>

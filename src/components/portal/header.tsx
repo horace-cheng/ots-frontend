@@ -1,10 +1,19 @@
 'use client'
-import Link from 'next/link'
+import { Link, useRouter, usePathname } from '@/i18n/routing'
+import { useLocale } from 'next-intl'
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/firebase'
 
 export function PortalHeader() {
   const { user } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  const locale = useLocale()
+
+  const handleLocaleChange = (newLocale: string) => {
+    router.replace(pathname, { locale: newLocale })
+  }
+
   return (
     <header className="site-header">
       <div className="site-header-inner">
@@ -16,6 +25,24 @@ export function PortalHeader() {
             className="sm-show">文學翻譯服務</span>
         </Link>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <select 
+            value={locale} 
+            onChange={(e) => handleLocaleChange(e.target.value)}
+            style={{ 
+              fontSize: '0.8rem', 
+              color: 'var(--ink)', 
+              background: 'transparent',
+              border: '1px solid rgba(138,155,181,0.5)',
+              borderRadius: '4px',
+              padding: '0.2rem 0.5rem',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="zh-TW">中文</option>
+            <option value="en">English</option>
+          </select>
+
           {user ? (
             <>
               <Link href="/orders" style={{ fontSize: '0.875rem', color: 'var(--mist)', textDecoration: 'none' }}

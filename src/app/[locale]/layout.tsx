@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import { Noto_Serif_TC, Noto_Sans_TC } from 'next/font/google'
 import { AuthProvider } from '@/lib/auth-context'
-import './globals.css'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages } from 'next-intl/server'
+import '../globals.css'
 
 const display = Noto_Serif_TC({
   subsets:  ['latin'],
@@ -20,11 +22,21 @@ export const metadata: Metadata = {
   description: '台語、客語、原住民族語 AI 輔助文學翻譯服務',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+  params: { locale }
+}: {
+  children: React.ReactNode,
+  params: { locale: string }
+}) {
+  const messages = await getMessages()
+
   return (
-    <html lang="zh-TW" className={`${display.variable} ${body.variable}`}>
+    <html lang={locale} className={`${display.variable} ${body.variable}`}>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <NextIntlClientProvider messages={messages}>
+          <AuthProvider>{children}</AuthProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   )

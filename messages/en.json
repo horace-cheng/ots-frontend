@@ -1,0 +1,22 @@
+{
+  "Login": {
+    "title": "Login",
+    "subtitle": "OTS Translation Platform",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "forgotPassword": "Forgot Password?",
+    "loginButton": "Login",
+    "loggingIn": "Logging in...",
+    "or": "or",
+    "googleLogin": "Login with Google",
+    "noAccount": "Don't have an account?",
+    "registerNow": "Register Now",
+    "adminLogin": "Admin Portal"
+  },
+  "Home": {
+    "title": "Cross-Language Bridge for ",
+    "titleHighlight": "Taiwanese Literature",
+    "subtitle": "AI-assisted translation for Taiwanese, Hakka, and Indigenous languages, guarded by linguists and literary editors.",
+    "loginToOrder": "Login to Order"
+  }
+}

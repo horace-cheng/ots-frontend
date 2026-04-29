@@ -1,0 +1,22 @@
+{
+  "Login": {
+    "title": "登入",
+    "subtitle": "木典翻譯服務平台",
+    "emailLabel": "Email",
+    "passwordLabel": "密碼",
+    "forgotPassword": "忘記密碼？",
+    "loginButton": "登入",
+    "loggingIn": "登入中…",
+    "or": "或",
+    "googleLogin": "Google 登入",
+    "noAccount": "尚未有帳號？",
+    "registerNow": "立即註冊",
+    "adminLogin": "後台管理員入口"
+  },
+  "Home": {
+    "title": "台灣文學的",
+    "titleHighlight": "跨語言橋樑",
+    "subtitle": "台語・客語・原住民族語 AI 輔助翻譯，由語言學家與文學編輯共同守護文化精髓",
+    "loginToOrder": "登入後下單"
+  }
+}
