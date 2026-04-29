@@ -13,7 +13,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV'
       - '--all-tags'
 
   # 3. Deploy the image to Google Cloud Run
