@@ -1,7 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app'
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
-  onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup
+  onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail
 } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -39,4 +39,8 @@ export async function getIdToken(): Promise<string | null> {
   const user = auth.currentUser
   if (!user) return null
   return user.getIdToken()
+}
+
+export async function resetPassword(email: string) {
+  return sendPasswordResetEmail(auth, email)
 }
