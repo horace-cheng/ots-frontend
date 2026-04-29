@@ -32,7 +32,7 @@ async function request<T>(
 // ── Orders ────────────────────────────────────────────────────────────────────
 export const createOrder = (data: {
   track_type: string; source_lang: string; target_lang: string
-  word_count: number; notes?: string
+  word_count: number; title?: string; notes?: string
 }) => request<{ order_id: string; payment_url: string; status: string; price_ntd: number; created_at: string }>(
   'POST', '/orders', data
 )
@@ -79,6 +79,12 @@ export async function uploadFile(
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
+export const adminGetOrder = (id: string) =>
+  request<Order & { qa_result?: QAResult }>('GET', `/admin/orders/${id}`)
+
+export const adminGetDownloadUrl = (id: string) =>
+  request<{ signed_url: string }>('GET', `/admin/orders/${id}/download-url`)
+
 export const adminListOrders = (params?: { status?: string; track_type?: string }) => {
   const qs = new URLSearchParams(params as Record<string, string>).toString()
   return request<{ orders: Order[]; total: number }>('GET', `/admin/orders${qs ? '?' + qs : ''}`)
@@ -102,6 +108,12 @@ export const confirmPayment = (order_id: string, amount: number, note?: string) 
 export const markDelivered = (order_id: string, gcs_output_path: string) =>
   request<{ message: string }>('POST', `/admin/orders/${order_id}/deliver?gcs_output_path=${encodeURIComponent(gcs_output_path)}`)
 
+export const adminListUsers = () =>
+  request<UserAccount[]>('GET', '/admin/users')
+
+export const adminUpdateUser = (id: string, data: { disabled?: boolean; is_admin?: boolean }) =>
+  request<{ message: string }>('PATCH', `/admin/users/${id}`, data)
+
 export const listAssignments = (status?: string) => {
   const qs = status ? `?status=${status}` : ''
   return request<Assignment[]>('GET', `/admin/assignments${qs}`)
@@ -119,6 +131,7 @@ export interface Order {
   target_lang: string
   word_count: number
   price_ntd: number
+  title?: string
   notes?: string
   created_at: string
   deadline_at?: string
@@ -126,6 +139,13 @@ export interface Order {
   payment_status?: string
   invoice_no?: string
   gcs_output_path?: string
+}
+
+export interface QAResult {
+  layer1_structure?:  { pass: boolean; flags: number; pass_count: number; overall_ratio: number }
+  layer2_semantic?:   { pass: boolean; flags: number; avg_score: number; sampled: number }
+  layer3_terminology?:{ pass: boolean; flags: number; terms_checked: number }
+  layer4_llm_judge?:  { pass: boolean; score: number; flags: number; evaluated: number }
 }
 
 export interface QAFlag {
@@ -140,6 +160,17 @@ export interface QAFlag {
   reviewer_note?: string
   resolved: boolean
   flagged_at: string
+}
+
+export interface UserAccount {
+  id: string
+  uid_firebase: string
+  email?: string
+  client_type: string
+  disabled: boolean
+  created_at: string
+  is_admin: boolean
+  admin_role?: string
 }
 
 export interface Assignment {

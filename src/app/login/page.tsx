@@ -80,8 +80,8 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-mist mt-6">
-          尚未有帳號？請聯繫{' '}
-          <a href="mailto:service@ots.tw" className="text-gold hover:underline">service@ots.tw</a>
+          尚未有帳號？{' '}
+          <Link href="/register" className="text-gold hover:underline">立即註冊</Link>
         </p>
         <p className="text-center text-xs text-mist mt-2">
           <Link href="/admin/login" className="hover:text-gold transition-colors">後台管理員入口</Link>

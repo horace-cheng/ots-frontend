@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { adminListQaFlags, resolveQaFlag, QAFlag } from '@/lib/api'
 import dayjs from 'dayjs'
 
@@ -50,7 +51,15 @@ export default function QAFlagsPage() {
     <div className="space-y-4 fade-up">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">QA 審閱</h1>
-        <span className="text-xs text-mist">{flags.length} 筆待處理</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-mist">{flags.length} 筆待處理</span>
+          <button onClick={load} disabled={busy}
+            className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors">
+            <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Level filter */}
@@ -91,6 +100,10 @@ export default function QAFlagsPage() {
                     {FLAG_TYPE_LABELS[f.flag_type] ?? f.flag_type}
                   </span>
                   <span className="text-xs text-mist">段落 {f.paragraph_index + 1}</span>
+                  <Link href={`/admin/orders/${f.order_id}`}
+                    className="text-xs text-gold/70 hover:text-gold font-mono transition-colors">
+                    #{f.order_id.slice(-8).toUpperCase()}
+                  </Link>
                 </div>
                 <span className="text-xs text-mist">{dayjs(f.flagged_at).format('MM/DD HH:mm')}</span>
               </div>
@@ -98,13 +111,17 @@ export default function QAFlagsPage() {
               {f.source_segment && (
                 <div className="rounded-lg bg-white/5 p-3">
                   <p className="text-xs text-mist mb-1">原文</p>
-                  <p className="text-sm text-paper/80 leading-relaxed">{f.source_segment}</p>
+                  <p className="text-sm text-paper/80 leading-relaxed whitespace-pre-wrap break-words">{f.source_segment}</p>
                 </div>
               )}
-              {f.translated_segment && (
+              {f.translated_segment && f.translated_segment !== f.source_segment ? (
                 <div className="rounded-lg bg-gold/5 border border-gold/10 p-3">
                   <p className="text-xs text-mist mb-1">譯文</p>
-                  <p className="text-sm text-paper/80 leading-relaxed">{f.translated_segment}</p>
+                  <p className="text-sm text-paper/80 leading-relaxed whitespace-pre-wrap break-words">{f.translated_segment}</p>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-white/5 border border-white/10 p-3">
+                  <p className="text-xs text-coral">譯文未取得（翻譯解析失敗）</p>
                 </div>
               )}
 

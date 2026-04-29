@@ -15,6 +15,7 @@ export default function OrdersPage() {
   const [total,  setTotal]  = useState(0)
   const [busy,   setBusy]   = useState(true)
   const [filter, setFilter] = useState('')
+  const [tick,   setTick]   = useState(0)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -26,7 +27,7 @@ export default function OrdersPage() {
     listOrders(filter ? { status: filter } : undefined)
       .then(d => { setOrders(d.orders); setTotal(d.total) })
       .finally(() => setBusy(false))
-  }, [user, filter])
+  }, [user, filter, tick])
 
   const FILTERS = [
     { value: '', label: '全部' },
@@ -46,7 +47,15 @@ export default function OrdersPage() {
             <h1 className="font-display text-2xl font-bold text-ink">我的訂單</h1>
             <p className="text-sm text-mist mt-0.5">共 {total} 筆</p>
           </div>
-          <Link href="/" className="btn-gold py-2 text-xs">＋ 新增訂單</Link>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setTick(t => t + 1)} disabled={busy}
+              className="p-2 rounded-lg border border-ink/20 text-mist hover:text-ink hover:border-ink/40 disabled:opacity-40 transition-colors">
+              <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <Link href="/" className="btn-gold py-2 text-xs">＋ 新增訂單</Link>
+          </div>
         </div>
 
         {/* Filter tabs */}
@@ -82,11 +91,9 @@ export default function OrdersPage() {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <StatusBadge status={o.status} />
                     <TrackBadge track={o.track_type} />
-                    <span className="text-xs text-mist">
-                      <LangLabel code={o.source_lang} /> → <LangLabel code={o.target_lang} />
-                    </span>
                   </div>
-                  <p className="text-xs text-mist font-mono truncate">{o.id}</p>
+                  <p className="text-sm font-medium text-ink truncate">{o.title}</p>
+                  <p className="text-xs text-mist font-mono truncate mt-0.5">{o.id.slice(-8).toUpperCase()}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-semibold text-ink">NT${o.price_ntd.toLocaleString()}</p>

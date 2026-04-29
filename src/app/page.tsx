@@ -38,7 +38,7 @@ async function readFileText(file: File): Promise<string> {
 export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [form, setForm]     = useState({ track_type: 'fast', source_lang: 'tai-lo', target_lang: 'en', notes: '' })
+  const [form, setForm]     = useState({ track_type: 'fast', source_lang: 'tai-lo', target_lang: 'en', title: '', notes: '' })
   const [wordCount, setWordCount] = useState(0)
   const [file, setFile]     = useState<File | null>(null)
   const [step, setStep]     = useState<'form' | 'upload' | 'confirm'>('form')
@@ -74,7 +74,7 @@ export default function HomePage() {
     if (!file) { setError('請選擇要上傳的文件'); return }
     setError(''); setBusy(true)
     try {
-      const order = await createOrder({ ...form, word_count: wordCount || 1 })
+      const order = await createOrder({ ...form, title: form.title.trim() || undefined, word_count: wordCount || 1 })
       setOrderId(order.order_id); setPrice(order.price_ntd); setStep('upload')
       const { signed_url, gcs_path } = await getUploadUrl({ order_id: order.order_id, filename: file.name, content_type: file.type || 'text/plain' })
       await uploadFile(signed_url, file, setProgress)
@@ -212,6 +212,13 @@ export default function HomePage() {
                   <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>{wordCount.toLocaleString()} 字・依實際報價為準</p>
                 </div>
               )}
+
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label className="field-label">訂單標題（選填）</label>
+                <input type="text" maxLength={50} placeholder="不填則自動產生，例：台語 → English 快速翻譯"
+                  className="field" value={form.title}
+                  onChange={e => set('title', e.target.value)} />
+              </div>
 
               <div style={{ marginBottom: '1rem' }}>
                 <label className="field-label">備注（選填）</label>

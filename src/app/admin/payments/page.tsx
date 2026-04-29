@@ -36,7 +36,15 @@ export default function AdminPaymentsPage() {
     <div className="space-y-4 fade-up">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">付款確認</h1>
-        <span className="text-xs text-mist">{orders.length} 筆待確認</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-mist">{orders.length} 筆待確認</span>
+          <button onClick={load} disabled={busy}
+            className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors">
+            <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-300">

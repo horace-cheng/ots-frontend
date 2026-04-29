@@ -62,6 +62,7 @@ export default function OrderDetailPage() {
   const [busy,        setBusy]        = useState(true)
   const [cancelling,  setCancelling]  = useState(false)
   const [error,       setError]       = useState('')
+  const [tick,        setTick]        = useState(0)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -69,13 +70,15 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (!user || !id) return
+    setBusy(true)
+    setError('')
     getOrder(id).then(o => {
       setOrder(o)
       if (o.status === 'delivered') {
         getDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
       }
     }).catch(() => setError('找不到此訂單')).finally(() => setBusy(false))
-  }, [user, id])
+  }, [user, id, tick])
 
   async function handleCancel() {
     if (!confirm('確定要取消訂單？')) return
@@ -115,10 +118,18 @@ export default function OrderDetailPage() {
             <Link href="/orders" className="text-xs text-mist hover:text-gold transition-colors">
               ← 我的訂單
             </Link>
-            <h1 className="font-display text-2xl font-bold text-ink mt-1">訂單詳情</h1>
+            <h1 className="font-display text-2xl font-bold text-ink mt-1">{order.title || '訂單詳情'}</h1>
             <p className="text-xs text-mist font-mono mt-0.5">{order.id}</p>
           </div>
-          <StatusBadge status={order.status} />
+          <div className="flex items-center gap-2">
+            <button onClick={() => setTick(t => t + 1)} disabled={busy}
+              className="p-2 rounded-lg border border-ink/20 text-mist hover:text-ink hover:border-ink/40 disabled:opacity-40 transition-colors">
+              <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <StatusBadge status={order.status} />
+          </div>
         </div>
 
         {/* Progress */}
@@ -135,7 +146,7 @@ export default function OrderDetailPage() {
               <p className="font-semibold text-green-800 text-sm">翻譯已完成！</p>
               <p className="text-xs text-green-600">下載連結有效 1 小時</p>
             </div>
-            <a href={downloadUrl} download className="btn-primary bg-green-700 text-sm py-2">
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="btn-primary bg-green-700 text-sm py-2">
               下載譯文
             </a>
           </div>

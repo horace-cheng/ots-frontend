@@ -11,6 +11,7 @@ export default function AdminOrdersPage() {
   const [filter, setFilter] = useState('')
   const [track,  setTrack]  = useState('')
   const [busy,   setBusy]   = useState(true)
+  const [tick,   setTick]   = useState(0)
 
   useEffect(() => {
     setBusy(true)
@@ -19,7 +20,7 @@ export default function AdminOrdersPage() {
       ...(track  ? { track_type: track } : {}),
     }).then(d => { setOrders(d.orders); setTotal(d.total) })
       .finally(() => setBusy(false))
-  }, [filter, track])
+  }, [filter, track, tick])
 
   const STATUS_FILTERS = [
     { v: '', l: '全部' },
@@ -34,7 +35,15 @@ export default function AdminOrdersPage() {
     <div className="space-y-4 fade-up">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">訂單管理</h1>
-        <span className="text-xs text-mist">共 {total} 筆</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-mist">共 {total} 筆</span>
+          <button onClick={() => setTick(t => t + 1)} disabled={busy}
+            className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors">
+            <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -64,7 +73,7 @@ export default function AdminOrdersPage() {
         <table className="w-full text-sm">
           <thead className="bg-white/5 border-b border-white/10">
             <tr>
-              {['訂單', '軌道', '語言', '金額', '狀態', '建立時間', '操作'].map(h => (
+              {['訂單', '標題', '軌道', '語言', '金額', '狀態', '建立時間', '操作'].map(h => (
                 <th key={h} className="text-left text-xs text-mist px-4 py-3 font-medium">{h}</th>
               ))}
             </tr>
@@ -73,7 +82,7 @@ export default function AdminOrdersPage() {
             {busy ? (
               Array(5).fill(0).map((_, i) => (
                 <tr key={i}>
-                  {Array(7).fill(0).map((__, j) => (
+                  {Array(8).fill(0).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 bg-white/10 rounded animate-pulse" />
                     </td>
@@ -81,10 +90,11 @@ export default function AdminOrdersPage() {
                 </tr>
               ))
             ) : orders.length === 0 ? (
-              <tr><td colSpan={7} className="text-center text-mist py-12 text-sm">無訂單</td></tr>
+              <tr><td colSpan={8} className="text-center text-mist py-12 text-sm">無訂單</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs text-mist">{o.id.slice(-8).toUpperCase()}</td>
+                <td className="px-4 py-3 text-sm text-paper max-w-[200px] truncate">{o.title || '—'}</td>
                 <td className="px-4 py-3"><TrackBadge track={o.track_type} /></td>
                 <td className="px-4 py-3 text-xs text-mist whitespace-nowrap">
                   <LangLabel code={o.source_lang} /> → <LangLabel code={o.target_lang} />
