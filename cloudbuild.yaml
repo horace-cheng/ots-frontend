@@ -4,16 +4,16 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:$COMMIT_SHA'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:$COMMIT_SHA'
       - '-t'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:latest'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:latest'
       - '.'
 
   # 2. Push the image to Google Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV'
       - '--all-tags'
 
   # 3. Deploy the image to Google Cloud Run
@@ -24,7 +24,7 @@ steps:
       - 'deploy'
       - 'ots-frontend-$_ENV'
       - '--image'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:$COMMIT_SHA'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:$COMMIT_SHA'
       - '--region'
       - 'asia-east1'
       - '--allow-unauthenticated'
@@ -36,8 +36,8 @@ steps:
       - '--set-env-vars=NEXT_PUBLIC_FIREBASE_APP_ID=$_NEXT_PUBLIC_FIREBASE_APP_ID'
 
 images:
-  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:$COMMIT_SHA'
-  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots-artifacts/ots-frontend-$_ENV:latest'
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:$COMMIT_SHA'
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
