@@ -39,6 +39,14 @@ steps:
       - 'asia-east1'
       - '--allow-unauthenticated'
 
+substitutions:
+  _ENV: 'dev'
+  _NEXT_PUBLIC_API_URL: ''
+  _NEXT_PUBLIC_FIREBASE_API_KEY: ''
+  _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ''
+  _NEXT_PUBLIC_FIREBASE_PROJECT_ID: ''
+  _NEXT_PUBLIC_FIREBASE_APP_ID: ''  
+
 images:
   - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:$COMMIT_SHA'
   - 'asia-east1-docker.pkg.dev/$PROJECT_ID/ots/ots-frontend-$_ENV:latest'
