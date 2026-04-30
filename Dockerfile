@@ -12,6 +12,11 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_FIREBASE_API_KEY=dummy
+ENV NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=dummy
+ENV NEXT_PUBLIC_FIREBASE_PROJECT_ID=dummy
+ENV NEXT_PUBLIC_FIREBASE_APP_ID=dummy
 ENV PORT=8080
 
 #COPY --from=builder /app/public ./public
