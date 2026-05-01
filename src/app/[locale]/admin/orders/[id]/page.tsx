@@ -4,8 +4,8 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetOrder, adminGetDownloadUrl, confirmPayment, markDelivered, adminListQaFlags,
-  adminUpdateOrderStatus,
-  Order, QAFlag, QAResult,
+  adminUpdateOrderStatus, adminListUsers, adminAssignEditor,
+  Order, QAFlag, QAResult, UserAccount
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import dayjs from 'dayjs'
@@ -74,6 +74,8 @@ export default function AdminOrderDetailPage() {
   const [error,       setError]       = useState('')
   const [tick,        setTick]        = useState(0)
   const [downloadUrl, setDownloadUrl] = useState('')
+  const [editors,     setEditors]     = useState<UserAccount[]>([])
+  const [assigning,   setAssigning]   = useState(false)
 
   async function handleUpdateStatus(newStatus: string) {
     if (!confirm(`確定將訂單狀態改為 ${newStatus}？`)) return
@@ -109,7 +111,25 @@ export default function AdminOrderDetailPage() {
         adminGetDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
       }
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
+
+    // 獨立獲取 Editor 列表用於指派
+    adminListUsers().then(d => {
+      setEditors(d.users.filter(u => u.is_editor))
+    }).catch(() => {})
   }, [id, tick])
+
+
+  async function handleAssignEditor(editorId: string) {
+    setAssigning(true)
+    try {
+      await adminAssignEditor(id, editorId || null)
+      setOrder(o => o ? { ...o, editor_id: editorId || undefined } : o)
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setAssigning(false)
+    }
+  }
 
   async function handleConfirmPayment() {
     const amount = Number(payAmount)
@@ -163,6 +183,22 @@ export default function AdminOrderDetailPage() {
     ...(order.invoice_no   ? [['發票號碼', <span key="inv" className="text-base font-mono">{order.invoice_no}</span>]] as [string, React.ReactNode][] : []),
     ...(order.notes        ? [['備註',     <span key="n"  className="text-base text-mist">{order.notes}</span>]] as [string, React.ReactNode][] : []),
     ...(order.gcs_output_path ? [['輸出路徑', <span key="gcs" className="text-xs font-mono text-mist break-all">{order.gcs_output_path}</span>]] as [string, React.ReactNode][] : []),
+    ['指派 Editor', (
+      <div key="ed" className="flex items-center gap-2">
+        <select
+          value={order.editor_id || ''}
+          onChange={e => handleAssignEditor(e.target.value)}
+          disabled={assigning}
+          className="rounded bg-white/10 border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-gold"
+        >
+          <option value="">未指派</option>
+          {editors.map(e => (
+            <option key={e.id} value={e.id}>{e.email || e.id.slice(-8)}</option>
+          ))}
+        </select>
+        {assigning && <div className="w-3 h-3 border border-gold/30 border-t-gold rounded-full animate-spin" />}
+      </div>
+    )],
   ]
 
   return (

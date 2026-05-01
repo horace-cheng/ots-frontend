@@ -138,6 +138,12 @@ export default function QaReviewEditorPage() {
                 <div className="mt-4 text-sm text-mist leading-relaxed whitespace-pre-wrap">
                   {seg.source}
                 </div>
+                {seg.editor_comments && (
+                  <div className="mt-3 bg-purple-500/10 p-2 rounded border border-purple-500/20">
+                    <p className="text-[10px] uppercase font-bold text-purple-400/60 mb-1">Editor 備註 (唯讀)</p>
+                    <p className="text-[11px] text-paper/80">{seg.editor_comments}</p>
+                  </div>
+                )}
               </div>
 
               {/* Right: Translation */}

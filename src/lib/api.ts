@@ -119,7 +119,7 @@ export const adminListUsers = (params?: { limit?: number; offset?: number }) => 
   return request<{ users: UserAccount[]; total: number }>('GET', `/admin/users${qs ? '?' + qs : ''}`)
 }
 
-export const adminUpdateUser = (id: string, data: { disabled?: boolean; is_admin?: boolean }) =>
+export const adminUpdateUser = (id: string, data: { disabled?: boolean; is_admin?: boolean; is_editor?: boolean }) =>
   request<{ message: string }>('PATCH', `/admin/users/${id}`, data)
 
 export const adminGetSegments = (id: string) =>
@@ -134,6 +134,29 @@ export const adminMarkQaDone = (id: string) =>
 export const adminUpdateOrderStatus = (id: string, status: string) =>
   request<{ message: string }>('PATCH', `/admin/orders/${id}/status?status=${status}`)
 
+export const adminAssignEditor = (order_id: string, editor_id: string | null) =>
+  request<{ message: string }>('PATCH', `/admin/orders/${order_id}/assign-editor`, { editor_id })
+
+
+// ── Editor ────────────────────────────────────────────────────────────────────
+export const editorListOrders = () =>
+  request<{ orders: Order[]; total: number }>('GET', '/editor/orders')
+
+export const editorGetOrder = (id: string) =>
+  request<Order>('GET', `/editor/orders/${id}`)
+
+export const editorGetSegments = (id: string) =>
+  request<{ segments: QASegment[] }>('GET', `/editor/orders/${id}/segments`)
+
+export const editorUpdateSegments = (id: string, segments: QASegmentUpdate[]) =>
+  request<{ message: string }>('PATCH', `/editor/orders/${id}/segments`, { segments })
+
+export const editorSubmit = (id: string) =>
+  request<{ message: string }>('POST', `/editor/orders/${id}/submit`)
+
+export const editorReturn = (id: string) =>
+  request<{ message: string }>('POST', `/editor/orders/${id}/return`)
+
 export const listAssignments = (params?: { status?: string; limit?: number; offset?: number }) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
@@ -143,6 +166,11 @@ export const listAssignments = (params?: { status?: string; limit?: number; offs
 
 export const updateAssignment = (order_id: string, data: { editor_id?: string; proofreader_id?: string }) =>
   request<Assignment>('PATCH', `/admin/assignments/${order_id}`, data)
+
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+export const getMe = () =>
+  request<UserProfile>('GET', '/users/me')
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface Order {
@@ -161,6 +189,19 @@ export interface Order {
   payment_status?: string
   invoice_no?: string
   gcs_output_path?: string
+  editor_id?: string
+}
+
+export interface UserProfile {
+  id:              string
+  uid_firebase:    string
+  client_type:     string
+  company_name?:   string
+  tax_id?:         string
+  invoice_carrier?: string
+  is_admin:        boolean
+  is_editor:       boolean
+  created_at:      string
 }
 
 export interface QAResult {
@@ -192,6 +233,7 @@ export interface UserAccount {
   disabled: boolean
   created_at: string
   is_admin: boolean
+  is_editor: boolean
   admin_role?: string
 }
 
@@ -212,6 +254,7 @@ export interface QASegment {
   translated:     string
   raw?:           string
   comments?:      string
+  editor_comments?: string
   flags:          QAFlag[]
 }
 
@@ -219,4 +262,5 @@ export interface QASegmentUpdate {
   index:      number
   translated: string
   comments?:  string
+  editor_comments?: string
 }

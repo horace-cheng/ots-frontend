@@ -19,18 +19,22 @@ export default function AdminUsersPage() {
       .finally(() => setBusy(false))
   }, [tick])
 
-  async function toggle(u: UserAccount, field: 'disabled' | 'is_admin') {
+  async function toggle(u: UserAccount, field: 'disabled' | 'is_admin' | 'is_editor') {
     setWorking(u.id + field)
     try {
       const payload = field === 'disabled'
         ? { disabled: !u.disabled }
-        : { is_admin: !u.is_admin }
+        : field === 'is_admin'
+          ? { is_admin: !u.is_admin }
+          : { is_editor: !u.is_editor }
       await adminUpdateUser(u.id, payload)
       setUsers(prev => prev.map(x =>
         x.id === u.id
           ? field === 'disabled'
             ? { ...x, disabled: !x.disabled }
-            : { ...x, is_admin: !x.is_admin, admin_role: !x.is_admin ? 'admin' : undefined }
+            : field === 'is_admin'
+              ? { ...x, is_admin: !x.is_admin, admin_role: !x.is_admin ? 'admin' : undefined }
+              : { ...x, is_editor: !x.is_editor }
           : x
       ))
     } catch (e: unknown) {
@@ -69,6 +73,7 @@ export default function AdminUsersPage() {
                 <th className="text-left px-4 py-3 font-medium hidden md:table-cell">類型</th>
                 <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">建立時間</th>
                 <th className="text-center px-4 py-3 font-medium">Admin</th>
+                <th className="text-center px-4 py-3 font-medium">Editor</th>
                 <th className="text-center px-4 py-3 font-medium">狀態</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -96,6 +101,15 @@ export default function AdminUsersPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
+                    {u.is_editor ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-purple-400/20 text-purple-400 font-medium">
+                        Editor
+                      </span>
+                    ) : (
+                      <span className="text-xs text-mist">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded font-medium ${
                       u.disabled
                         ? 'bg-coral/20 text-coral'
@@ -111,6 +125,12 @@ export default function AdminUsersPage() {
                         disabled={working !== null}
                         className="text-xs px-2.5 py-1 rounded border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors whitespace-nowrap">
                         {working === u.id + 'is_admin' ? '…' : u.is_admin ? '撤銷 Admin' : '設為 Admin'}
+                      </button>
+                      <button
+                        onClick={() => toggle(u, 'is_editor')}
+                        disabled={working !== null}
+                        className="text-xs px-2.5 py-1 rounded border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors whitespace-nowrap">
+                        {working === u.id + 'is_editor' ? '…' : u.is_editor ? '撤銷 Editor' : '設為 Editor'}
                       </button>
                       <button
                         onClick={() => toggle(u, 'disabled')}
