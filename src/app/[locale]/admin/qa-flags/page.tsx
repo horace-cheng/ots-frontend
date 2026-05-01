@@ -14,7 +14,7 @@ export default function QAFlagsPage() {
   function load() {
     setBusy(true)
     adminListQaFlags({ flag_level: level || undefined, resolved: false })
-      .then(setFlags).finally(() => setBusy(false))
+      .then(d => setFlags(d.flags)).finally(() => setBusy(false))
   }
 
   useEffect(load, [level])

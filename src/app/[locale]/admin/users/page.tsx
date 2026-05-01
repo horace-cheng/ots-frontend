@@ -14,7 +14,7 @@ export default function AdminUsersPage() {
     setBusy(true)
     setError('')
     adminListUsers()
-      .then(setUsers)
+      .then(d => setUsers(d.users))
       .catch(e => setError(e.message))
       .finally(() => setBusy(false))
   }, [tick])

@@ -22,7 +22,7 @@ export default function LiteraryPage() {
 
   useEffect(() => {
     setBusy(true)
-    listAssignments().then(setAssignments).finally(() => setBusy(false))
+    listAssignments().then(d => setAssignments(d.assignments)).finally(() => setBusy(false))
   }, [tick])
 
   async function handleAssign(orderId: string) {

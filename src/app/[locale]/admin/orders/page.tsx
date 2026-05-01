@@ -3,24 +3,33 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { adminListOrders, Order } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import dayjs from 'dayjs'
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [total,  setTotal]  = useState(0)
+  const [total, setTotal] = useState(0)
   const [filter, setFilter] = useState('')
-  const [track,  setTrack]  = useState('')
-  const [busy,   setBusy]   = useState(true)
-  const [tick,   setTick]   = useState(0)
+  const [track, setTrack] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [busy, setBusy] = useState(true)
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, track, pageSize])
 
   useEffect(() => {
     setBusy(true)
     adminListOrders({
       ...(filter ? { status: filter } : {}),
-      ...(track  ? { track_type: track } : {}),
+      ...(track ? { track_type: track } : {}),
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
     }).then(d => { setOrders(d.orders); setTotal(d.total) })
       .finally(() => setBusy(false))
-  }, [filter, track, tick])
+  }, [filter, track, page, pageSize, tick])
 
   const STATUS_FILTERS = [
     { v: '', l: '全部' },
@@ -119,6 +128,15 @@ export default function AdminOrdersPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        total={total}
+        pageSize={pageSize}
+        currentPage={page}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        theme="dark"
+      />
     </div>
   )
 }

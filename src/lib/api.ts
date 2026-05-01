@@ -40,8 +40,10 @@ export const createOrder = (data: {
 export const getOrder = (id: string) =>
   request<Order>('GET', `/orders/${id}`)
 
-export const listOrders = (params?: { status?: string; track_type?: string }) => {
-  const qs = new URLSearchParams(params as Record<string, string>).toString()
+export const listOrders = (params?: { status?: string; track_type?: string; limit?: number; offset?: number }) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
+  ).toString()
   return request<{ orders: Order[]; total: number }>('GET', `/orders${qs ? '?' + qs : ''}`)
 }
 
@@ -85,16 +87,18 @@ export const adminGetOrder = (id: string) =>
 export const adminGetDownloadUrl = (id: string) =>
   request<{ signed_url: string }>('GET', `/admin/orders/${id}/download-url`)
 
-export const adminListOrders = (params?: { status?: string; track_type?: string }) => {
-  const qs = new URLSearchParams(params as Record<string, string>).toString()
-  return request<{ orders: Order[]; total: number }>('GET', `/admin/orders${qs ? '?' + qs : ''}`)
-}
-
-export const adminListQaFlags = (params?: { flag_level?: string; resolved?: boolean }) => {
+export const adminListOrders = (params?: { status?: string; track_type?: string; limit?: number; offset?: number }) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
   ).toString()
-  return request<QAFlag[]>('GET', `/admin/qa-flags${qs ? '?' + qs : ''}`)
+  return request<{ orders: Order[]; total: number }>('GET', `/admin/orders${qs ? '?' + qs : ''}`)
+}
+
+export const adminListQaFlags = (params?: { flag_level?: string; resolved?: boolean; order_id?: string; limit?: number; offset?: number }) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
+  ).toString()
+  return request<{ flags: QAFlag[]; total: number }>('GET', `/admin/qa-flags${qs ? '?' + qs : ''}`)
 }
 
 export const resolveQaFlag = (id: string, reviewer_note: string) =>
@@ -108,8 +112,12 @@ export const confirmPayment = (order_id: string, amount: number, note?: string) 
 export const markDelivered = (order_id: string, gcs_output_path: string) =>
   request<{ message: string }>('POST', `/admin/orders/${order_id}/deliver?gcs_output_path=${encodeURIComponent(gcs_output_path)}`)
 
-export const adminListUsers = () =>
-  request<UserAccount[]>('GET', '/admin/users')
+export const adminListUsers = (params?: { limit?: number; offset?: number }) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
+  ).toString()
+  return request<{ users: UserAccount[]; total: number }>('GET', `/admin/users${qs ? '?' + qs : ''}`)
+}
 
 export const adminUpdateUser = (id: string, data: { disabled?: boolean; is_admin?: boolean }) =>
   request<{ message: string }>('PATCH', `/admin/users/${id}`, data)
@@ -126,9 +134,11 @@ export const adminMarkQaDone = (id: string) =>
 export const adminUpdateOrderStatus = (id: string, status: string) =>
   request<{ message: string }>('PATCH', `/admin/orders/${id}/status?status=${status}`)
 
-export const listAssignments = (status?: string) => {
-  const qs = status ? `?status=${status}` : ''
-  return request<Assignment[]>('GET', `/admin/assignments${qs}`)
+export const listAssignments = (params?: { status?: string; limit?: number; offset?: number }) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
+  ).toString()
+  return request<{ assignments: Assignment[]; total: number }>('GET', `/admin/assignments${qs ? '?' + qs : ''}`)
 }
 
 export const updateAssignment = (order_id: string, data: { editor_id?: string; proofreader_id?: string }) =>

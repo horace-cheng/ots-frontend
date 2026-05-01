@@ -2,10 +2,14 @@
 import { useEffect, useState } from 'react'
 import { adminListOrders, confirmPayment, Order } from '@/lib/api'
 import { LangLabel, TrackBadge } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import dayjs from 'dayjs'
 
 export default function AdminPaymentsPage() {
   const [orders,  setOrders]  = useState<Order[]>([])
+  const [total,   setTotal]   = useState(0)
+  const [page,    setPage]    = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [busy,    setBusy]    = useState(true)
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [notes,   setNotes]   = useState<Record<string, string>>({})
@@ -13,12 +17,20 @@ export default function AdminPaymentsPage() {
 
   function load() {
     setBusy(true)
-    adminListOrders({ status: 'pending_payment' })
-      .then(d => setOrders(d.orders))
+    adminListOrders({
+      status: 'pending_payment',
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    })
+      .then(d => { setOrders(d.orders); setTotal(d.total) })
       .finally(() => setBusy(false))
   }
 
-  useEffect(load, [])
+  useEffect(() => {
+    setPage(1)
+  }, [pageSize])
+
+  useEffect(load, [page, pageSize])
 
   async function handleConfirm(order: Order) {
     const amt = parseInt(amounts[order.id] || String(order.price_ntd))
@@ -27,6 +39,11 @@ export default function AdminPaymentsPage() {
     try {
       await confirmPayment(order.id, amt, notes[order.id])
       setOrders(os => os.filter(o => o.id !== order.id))
+      if (page > 1 && orders.length === 1) {
+        setPage(p => p - 1)
+      } else {
+        load()
+      }
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : '確認失敗')
     } finally { setSaving(s => ({ ...s, [order.id]: false })) }
@@ -37,7 +54,7 @@ export default function AdminPaymentsPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">付款確認</h1>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-mist">{orders.length} 筆待確認</span>
+          <span className="text-xs text-mist">{total} 筆待確認</span>
           <button onClick={load} disabled={busy}
             className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors">
             <svg className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,6 +128,15 @@ export default function AdminPaymentsPage() {
               </div>
             </div>
           ))}
+
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            theme="dark"
+          />
         </div>
       )}
     </div>

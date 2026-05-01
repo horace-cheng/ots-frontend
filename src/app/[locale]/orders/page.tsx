@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { listOrders, Order } from '@/lib/api'
 import { PortalHeader } from '@/components/portal/header'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import dayjs from 'dayjs'
 
 export default function OrdersPage() {
@@ -15,19 +16,29 @@ export default function OrdersPage() {
   const [total,  setTotal]  = useState(0)
   const [busy,   setBusy]   = useState(true)
   const [filter, setFilter] = useState('')
-  const [tick,   setTick]   = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
   }, [user, loading, router])
 
   useEffect(() => {
+    setPage(1)
+  }, [filter, pageSize])
+
+  useEffect(() => {
     if (!user) return
     setBusy(true)
-    listOrders(filter ? { status: filter } : undefined)
+    listOrders({
+      ...(filter ? { status: filter } : {}),
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    })
       .then(d => { setOrders(d.orders); setTotal(d.total) })
       .finally(() => setBusy(false))
-  }, [user, filter, tick])
+  }, [user, filter, page, pageSize, tick])
 
   const FILTERS = [
     { value: '', label: '全部' },
@@ -104,6 +115,15 @@ export default function OrdersPage() {
                 </svg>
               </Link>
             ))}
+
+            <Pagination
+              total={total}
+              pageSize={pageSize}
+              currentPage={page}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              theme="light"
+            />
           </div>
         )}
       </div>

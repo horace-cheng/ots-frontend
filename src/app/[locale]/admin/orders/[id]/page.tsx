@@ -100,11 +100,11 @@ export default function AdminOrderDetailPage() {
     setDownloadUrl('')
     Promise.all([
       adminGetOrder(id),
-      adminListQaFlags(),
+      adminListQaFlags({ order_id: id }),
     ]).then(([o, flags]) => {
       setOrder(o)
       setGcsPath(o.gcs_output_path ?? '')
-      setQaFlags(flags.filter(f => f.order_id === id))
+      setQaFlags(flags.flags)
       if (o.gcs_output_path) {
         adminGetDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
       }

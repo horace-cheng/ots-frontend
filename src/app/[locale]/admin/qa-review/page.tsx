@@ -3,24 +3,36 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { adminListOrders, Order } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import dayjs from 'dayjs'
 
 export default function QaReviewListPage() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [busy,   setBusy]   = useState(true)
+  const [total,  setTotal]  = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [busy, setBusy] = useState(true)
+
+  useEffect(() => {
+    setPage(1)
+  }, [pageSize])
 
   useEffect(() => {
     setBusy(true)
-    adminListOrders({ status: 'qa_review' })
-      .then(d => setOrders(d.orders))
+    adminListOrders({
+      status: 'qa_review',
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    })
+      .then(d => { setOrders(d.orders); setTotal(d.total) })
       .finally(() => setBusy(false))
-  }, [])
+  }, [page, pageSize])
 
   return (
     <div className="space-y-4 fade-up">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">待審閱訂單</h1>
-        <span className="text-xs text-mist">共 {orders.length} 筆</span>
+        <span className="text-xs text-mist">共 {total} 筆</span>
       </div>
 
       <div className="rounded-xl border border-white/10 overflow-hidden">
@@ -66,6 +78,15 @@ export default function QaReviewListPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        total={total}
+        pageSize={pageSize}
+        currentPage={page}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        theme="dark"
+      />
     </div>
   )
 }
