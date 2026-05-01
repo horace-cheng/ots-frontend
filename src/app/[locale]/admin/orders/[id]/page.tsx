@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetOrder, adminGetDownloadUrl, confirmPayment, markDelivered, adminListQaFlags,
+  adminUpdateOrderStatus,
   Order, QAFlag, QAResult,
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
@@ -73,6 +74,16 @@ export default function AdminOrderDetailPage() {
   const [error,       setError]       = useState('')
   const [tick,        setTick]        = useState(0)
   const [downloadUrl, setDownloadUrl] = useState('')
+
+  async function handleUpdateStatus(newStatus: string) {
+    if (!confirm(`確定將訂單狀態改為 ${newStatus}？`)) return
+    try {
+      await adminUpdateOrderStatus(id, newStatus)
+      setTick(t => t + 1)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
 
   // confirm payment
   const [payAmount,   setPayAmount]   = useState('')
@@ -173,6 +184,22 @@ export default function AdminOrderDetailPage() {
           </button>
           <StatusBadge status={order.status} />
         </div>
+      </div>
+
+      {/* QA Review Action */}
+      <div className="flex gap-3">
+        {order.status === 'qa_review' && (
+          <Link href={`/admin/orders/${order.id}/review`}
+            className="flex-1 px-4 py-3 rounded-xl bg-gold text-white font-bold text-center hover:bg-gold/90 transition-all shadow-lg shadow-gold/20">
+            進入 QA 審閱編輯器
+          </Link>
+        )}
+        {order.status === 'delivered' && (
+          <button onClick={() => handleUpdateStatus('qa_review')}
+            className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-mist text-sm hover:text-paper hover:bg-white/10 transition-all">
+            重啟 QA 審閱 (由已交付改回)
+          </button>
+        )}
       </div>
 
       {/* Translated result */}

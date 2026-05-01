@@ -114,6 +114,18 @@ export const adminListUsers = () =>
 export const adminUpdateUser = (id: string, data: { disabled?: boolean; is_admin?: boolean }) =>
   request<{ message: string }>('PATCH', `/admin/users/${id}`, data)
 
+export const adminGetSegments = (id: string) =>
+  request<{ segments: QASegment[] }>('GET', `/admin/orders/${id}/segments`)
+
+export const adminUpdateSegments = (id: string, segments: QASegmentUpdate[]) =>
+  request<{ message: string }>('PATCH', `/admin/orders/${id}/segments`, { segments })
+
+export const adminMarkQaDone = (id: string) =>
+  request<{ message: string }>('POST', `/admin/orders/${id}/qa-done`)
+
+export const adminUpdateOrderStatus = (id: string, status: string) =>
+  request<{ message: string }>('PATCH', `/admin/orders/${id}/status?status=${status}`)
+
 export const listAssignments = (status?: string) => {
   const qs = status ? `?status=${status}` : ''
   return request<Assignment[]>('GET', `/admin/assignments${qs}`)
@@ -182,4 +194,19 @@ export interface Assignment {
   assigned_at: string
   editor_submitted_at?: string
   proofread_submitted_at?: string
+}
+
+export interface QASegment {
+  index:          number
+  source:         string
+  translated:     string
+  raw?:           string
+  comments?:      string
+  flags:          QAFlag[]
+}
+
+export interface QASegmentUpdate {
+  index:      number
+  translated: string
+  comments?:  string
 }

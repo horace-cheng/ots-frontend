@@ -38,6 +38,8 @@ steps:
       - '--region'
       - 'asia-east1'
       - '--allow-unauthenticated'
+      - '--min-instances=0'
+      - '--max-instances=3'
 
 substitutions:
   _ENV: 'dev'

@@ -25,10 +25,10 @@ export default function AdminOrdersPage() {
   const STATUS_FILTERS = [
     { v: '', l: '全部' },
     { v: 'pending_payment', l: '待付款' },
-    { v: 'paid',            l: '已付款' },
-    { v: 'processing',      l: '翻譯中' },
-    { v: 'qa_review',       l: 'QA 審閱' },
-    { v: 'delivered',       l: '已交付' },
+    { v: 'paid', l: '已付款' },
+    { v: 'processing', l: '翻譯中' },
+    { v: 'qa_review', l: 'QA 審閱' },
+    { v: 'delivered', l: '已交付' },
   ]
 
   return (
@@ -50,18 +50,16 @@ export default function AdminOrdersPage() {
       <div className="flex gap-2 flex-wrap">
         {STATUS_FILTERS.map(f => (
           <button key={f.v} onClick={() => setFilter(f.v)}
-            className={`px-3 py-1 rounded-full text-xs border transition-all ${
-              filter === f.v ? 'bg-gold border-gold text-white' : 'border-white/20 text-mist hover:border-white/40'
-            }`}>
+            className={`px-3 py-1 rounded-full text-xs border transition-all ${filter === f.v ? 'bg-gold border-gold text-white' : 'border-white/20 text-mist hover:border-white/40'
+              }`}>
             {f.l}
           </button>
         ))}
         <div className="ml-auto flex gap-2">
           {['', 'fast', 'literary'].map((t, i) => (
             <button key={t} onClick={() => setTrack(t)}
-              className={`px-3 py-1 rounded-full text-xs border transition-all ${
-                track === t ? 'bg-white/20 border-white/40 text-paper' : 'border-white/10 text-mist hover:border-white/20'
-              }`}>
+              className={`px-3 py-1 rounded-full text-xs border transition-all ${track === t ? 'bg-white/20 border-white/40 text-paper' : 'border-white/10 text-mist hover:border-white/20'
+                }`}>
               {['全部', 'Fast', 'Literary'][i]}
             </button>
           ))}
@@ -103,10 +101,18 @@ export default function AdminOrdersPage() {
                 <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                 <td className="px-4 py-3 text-xs text-mist">{dayjs(o.created_at).format('MM/DD HH:mm')}</td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/orders/${o.id}`}
-                    className="text-xs text-gold hover:underline">
-                    詳情
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/admin/orders/${o.id}`}
+                      className="text-xs text-gold hover:underline">
+                      詳情
+                    </Link>
+                    {(o.status === 'qa_review' || o.status === 'delivered') && (
+                      <Link href={`/admin/orders/${o.id}/review`}
+                        className="text-xs text-paper bg-gold/20 px-2 py-0.5 rounded hover:bg-gold/30 transition-colors">
+                        QA 審閱
+                      </Link>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
