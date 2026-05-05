@@ -211,11 +211,11 @@ export default function AdminOrderDetailPage() {
           value={order.editor_id || ''}
           onChange={e => handleAssign(e.target.value || undefined)}
           disabled={assigning || isDelivered}
-          className="rounded bg-white/10 border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-gold disabled:opacity-40"
+          className="rounded bg-[#1e293b] border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-gold disabled:opacity-40"
         >
-          <option value="" className="bg-night text-paper">未指派</option>
+          <option value="" className="bg-[#1e293b] text-paper">未指派</option>
           {editors.map(e => (
-            <option key={e.id} value={e.id} className="bg-night text-paper">{e.email || e.id.slice(-8)}</option>
+            <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
           ))}
         </select>
       </div>
@@ -226,11 +226,11 @@ export default function AdminOrderDetailPage() {
           value={order.qa_id || ''}
           onChange={e => handleAssign(undefined, e.target.value || undefined)}
           disabled={assigning || isDelivered}
-          className="rounded bg-white/10 border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
+          className="rounded bg-[#1e293b] border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
         >
-          <option value="" className="bg-night text-paper">未指派</option>
+          <option value="" className="bg-[#1e293b] text-paper">未指派</option>
           {qas.map(e => (
-            <option key={e.id} value={e.id} className="bg-night text-paper">{e.email || e.id.slice(-8)}</option>
+            <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
           ))}
         </select>
         {assigning && <div className="w-3 h-3 border border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />}
