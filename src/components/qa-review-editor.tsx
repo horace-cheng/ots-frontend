@@ -15,6 +15,7 @@ interface QaReviewEditorProps {
   onSaveDraft: () => Promise<void>
   onSubmit: () => Promise<void>
   submitLabel?: string
+  onOpenOriginal?: () => void
 }
 
 export default function QaReviewEditor({
@@ -27,8 +28,10 @@ export default function QaReviewEditor({
   onSaveDraft,
   onSubmit,
   submitLabel = '完成審閱並交付',
+  onOpenOriginal,
 }: QaReviewEditorProps) {
   const [saving, setSaving] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
 
   const handleSegmentChange = (index: number, field: 'translated' | 'comments', value: string) => {
     onSegmentsChange(
@@ -94,6 +97,22 @@ export default function QaReviewEditor({
         </div>
 
         <div className="flex items-center gap-3">
+          {order.notes && (
+            <button onClick={() => setShowNotes(!showNotes)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                showNotes
+                  ? 'bg-gold/10 border-gold/30 text-gold'
+                  : 'border-white/10 text-mist hover:text-paper hover:bg-white/5'
+              }`}>
+              備註
+            </button>
+          )}
+          {onOpenOriginal && (
+            <button onClick={onOpenOriginal}
+              className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
+              原始內容
+            </button>
+          )}
           <StatusBadge status={order.status} />
           {!isReadOnly && (
             <>
@@ -114,6 +133,14 @@ export default function QaReviewEditor({
           )}
         </div>
       </div>
+
+      {/* Notes Panel */}
+      {showNotes && order.notes && (
+        <div className="shrink-0 bg-amber-400/5 border-b border-amber-400/10 px-6 py-3">
+          <p className="text-xs text-amber-400/60 uppercase font-bold mb-1">訂單備註</p>
+          <p className="text-sm text-paper/80 whitespace-pre-wrap">{order.notes}</p>
+        </div>
+      )}
 
       {/* Editor Content */}
       <div className="flex-1 overflow-auto custom-scrollbar">

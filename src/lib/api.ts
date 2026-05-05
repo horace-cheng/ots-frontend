@@ -101,6 +101,9 @@ export const adminGetOrder = (id: string) =>
 export const adminGetDownloadUrl = (id: string) =>
   request<{ signed_url: string }>('GET', `/admin/orders/${id}/download-url`)
 
+export const adminGetOriginalContent = (id: string) =>
+  request<{ filename: string; content_type: string; text: string }>('GET', `/admin/orders/${id}/original-content`)
+
 export const adminListOrders = (params?: { status?: string; track_type?: string; limit?: number; offset?: number }) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
@@ -228,6 +231,7 @@ export interface Order {
   payment_status?: string
   invoice_no?: string
   gcs_output_path?: string
+  gcs_upload_path?: string
   editor_id?: string
   qa_id?: string
   qa_submitted_at?: string

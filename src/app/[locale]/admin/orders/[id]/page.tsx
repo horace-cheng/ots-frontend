@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  adminGetOrder, adminGetDownloadUrl, confirmPayment, markDelivered, adminListQaFlags,
+  adminGetOrder, adminGetDownloadUrl, adminGetOriginalContent, confirmPayment, markDelivered, adminListQaFlags,
   adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate,
   Order, QAFlag, QAResult, UserAccount
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
+import OriginalContentViewer from '@/components/original-content-viewer'
 import dayjs from 'dayjs'
 
 function ScoreBadge({ score }: { score: number }) {
@@ -77,6 +78,7 @@ export default function AdminOrderDetailPage() {
   const [editors,     setEditors]     = useState<UserAccount[]>([])
   const [qas,         setQas]         = useState<UserAccount[]>([])
   const [assigning,   setAssigning]   = useState(false)
+  const [showOriginal, setShowOriginal] = useState(false)
 
   async function handleUpdateStatus(newStatus: string) {
     if (!confirm(`確定將訂單狀態改為 ${newStatus}？`)) return
@@ -205,6 +207,12 @@ export default function AdminOrderDetailPage() {
     ...(order.invoice_no   ? [['發票號碼', <span key="inv" className="text-base font-mono">{order.invoice_no}</span>]] as [string, React.ReactNode][] : []),
     ...(order.notes        ? [['備註',     <span key="n"  className="text-base text-mist">{order.notes}</span>]] as [string, React.ReactNode][] : []),
     ...(order.gcs_output_path ? [['輸出路徑', <span key="gcs" className="text-xs font-mono text-mist break-all">{order.gcs_output_path}</span>]] as [string, React.ReactNode][] : []),
+    ...(order.gcs_upload_path ? [['原始檔案', (
+      <button key="orig" onClick={() => setShowOriginal(true)}
+        className="text-xs text-gold hover:text-gold-light underline underline-offset-2">
+        查看原始內容
+      </button>
+    )]] as [string, React.ReactNode][] : []),
     ['指派 Editor', (
       <div key="ed" className="flex items-center gap-2">
         <select
@@ -377,6 +385,12 @@ export default function AdminOrderDetailPage() {
           ))}
         </div>
       )}
+
+      <OriginalContentViewer
+        open={showOriginal}
+        onClose={() => setShowOriginal(false)}
+        fetchContent={() => adminGetOriginalContent(id)}
+      />
     </div>
   )
 }

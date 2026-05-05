@@ -2,10 +2,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  adminGetOrder, adminGetSegments, adminUpdateSegments, adminMarkQaDone,
+  adminGetOrder, adminGetSegments, adminGetOriginalContent, adminUpdateSegments, adminMarkQaDone,
   Order, QASegment,
 } from '@/lib/api'
 import QaReviewEditor from '@/components/qa-review-editor'
+import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function QaReviewEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -15,6 +16,7 @@ export default function QaReviewEditorPage() {
   const [segments, setSegments] = useState<QASegment[]>([])
   const [busy,     setBusy]     = useState(true)
   const [error,    setError]    = useState('')
+  const [showOriginal, setShowOriginal] = useState(false)
 
   useEffect(() => {
     setBusy(true)
@@ -38,25 +40,34 @@ export default function QaReviewEditorPage() {
   )
 
   return (
-    <QaReviewEditor
-      order={order}
-      segments={segments}
-      backHref={`/admin/orders/${id}`}
-      isReadOnly={order.status === 'delivered'}
-      accent="gold"
-      onSegmentsChange={(updated) => setSegments(updated)}
-      onSaveDraft={async () => {
-        await adminUpdateSegments(id, segments.map(s => ({
-          index: s.index,
-          translated: s.translated,
-          comments: s.comments,
-        })))
-      }}
-      onSubmit={async () => {
-        await adminMarkQaDone(id)
-        alert('審閱完成，訂單已交付')
-        router.push(`/admin/orders/${id}`)
-      }}
-    />
+    <>
+      <QaReviewEditor
+        order={order}
+        segments={segments}
+        backHref={`/admin/orders/${id}`}
+        isReadOnly={order.status === 'delivered'}
+        accent="gold"
+        onSegmentsChange={(updated) => setSegments(updated)}
+        onOpenOriginal={order.gcs_upload_path ? () => setShowOriginal(true) : undefined}
+        onSaveDraft={async () => {
+          await adminUpdateSegments(id, segments.map(s => ({
+            index: s.index,
+            translated: s.translated,
+            comments: s.comments,
+          })))
+        }}
+        onSubmit={async () => {
+          await adminMarkQaDone(id)
+          alert('審閱完成，訂單已交付')
+          router.push(`/admin/orders/${id}`)
+        }}
+      />
+
+      <OriginalContentViewer
+        open={showOriginal}
+        onClose={() => setShowOriginal(false)}
+        fetchContent={() => adminGetOriginalContent(id)}
+      />
+    </>
   )
 }
