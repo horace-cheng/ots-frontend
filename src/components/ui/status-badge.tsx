@@ -5,7 +5,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   paid:            { label: '已付款', cls: 'badge-paid' },
   processing:      { label: '翻譯中', cls: 'badge-processing' },
   qa_review:       { label: 'QA 審閱', cls: 'badge-qa' },
-  editor_verify:   { label: 'Editor 審閱', cls: 'badge-processing bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  editor_verify:   { label: '編輯審閱', cls: 'badge-processing bg-purple-500/20 text-purple-400 border-purple-500/30' },
   delivered:       { label: '已交付', cls: 'badge-delivered' },
   cancelled:       { label: '已取消', cls: 'badge-cancelled' },
 }

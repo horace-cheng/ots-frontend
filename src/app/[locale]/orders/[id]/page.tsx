@@ -13,6 +13,7 @@ const STEPS = [
   { key: 'paid',            label: '付款確認' },
   { key: 'processing',      label: '翻譯進行中' },
   { key: 'qa_review',       label: 'QA 審閱' },
+  { key: 'editor_verify',   label: '編輯審閱' },
   { key: 'delivered',       label: '翻譯完成' },
 ]
 

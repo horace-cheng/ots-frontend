@@ -114,7 +114,7 @@ export default function EditorVerifyPage() {
           </Link>
           <div>
             <h1 className="text-lg font-bold text-paper flex items-center gap-2">
-              {me?.is_qa && !me?.is_editor ? 'QA 審閱編輯器' : 'Editor 審閱編輯器'}
+              {me?.is_qa && !me?.is_editor ? 'QA 審閱編輯器' : '編輯審閱編輯器'}
               <span className="text-xs font-mono text-mist bg-white/5 px-2 py-0.5 rounded uppercase tracking-tighter">
                 {id.slice(-8)}
               </span>
