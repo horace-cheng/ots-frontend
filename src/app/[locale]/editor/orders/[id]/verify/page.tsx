@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   editorGetOrder, editorGetSegments, editorUpdateSegments, editorSubmit, editorReturn,
-  Order, QASegment,
+  Order, QASegment, UserProfile, getMe
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 
@@ -14,6 +14,7 @@ export default function EditorVerifyPage() {
 
   const [order,    setOrder]    = useState<Order | null>(null)
   const [segments, setSegments] = useState<QASegment[]>([])
+  const [me,       setMe]       = useState<UserProfile | null>(null)
   const [busy,     setBusy]     = useState(true)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
@@ -23,9 +24,11 @@ export default function EditorVerifyPage() {
     Promise.all([
       editorGetOrder(id),
       editorGetSegments(id),
-    ]).then(([o, s]) => {
+      getMe(),
+    ]).then(([o, s, user]) => {
       setOrder(o)
       setSegments(s.segments)
+      setMe(user)
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
   }, [id])
 
@@ -50,7 +53,9 @@ export default function EditorVerifyPage() {
   }
 
   const handleSubmit = async () => {
-    if (!confirm('確定完成審閱並提交交付？')) return
+    const isQA = me?.is_qa && !me?.is_editor && !me?.is_admin
+    const msg = isQA ? '確定完成審閱並提交給 Editor？' : '確定完成審閱並提交交付？'
+    if (!confirm(msg)) return
     setSaving(true)
     try {
       await editorUpdateSegments(id, segments.map(s => ({
@@ -59,7 +64,7 @@ export default function EditorVerifyPage() {
         editor_comments: s.editor_comments,
       })))
       await editorSubmit(id)
-      alert('審閱完成，訂單已交付')
+      alert(isQA ? '已提交給 Editor' : '審閱完成，訂單已交付')
       router.push('/editor/orders')
     } catch (e: any) {
       alert(e.message || '提交失敗')
@@ -89,7 +94,7 @@ export default function EditorVerifyPage() {
 
   if (busy) return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
     </div>
   )
 
@@ -109,7 +114,7 @@ export default function EditorVerifyPage() {
           </Link>
           <div>
             <h1 className="text-lg font-bold text-paper flex items-center gap-2">
-              Editor 審閱編輯器
+              {me?.is_qa && !me?.is_editor ? 'QA 審閱編輯器' : 'Editor 審閱編輯器'}
               <span className="text-xs font-mono text-mist bg-white/5 px-2 py-0.5 rounded uppercase tracking-tighter">
                 {id.slice(-8)}
               </span>
@@ -128,13 +133,15 @@ export default function EditorVerifyPage() {
             className="px-4 py-2 rounded-lg border border-white/10 text-sm font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             {saving ? '處理中...' : '儲存草稿'}
           </button>
-          <button onClick={handleReturnToQa} disabled={saving}
-            className="px-4 py-2 rounded-lg border border-coral/30 text-sm font-medium text-coral hover:bg-coral/5 transition-all">
-            退回 QA
-          </button>
+          {(!me?.is_qa || me?.is_editor || me?.is_admin) && (
+            <button onClick={handleReturnToQa} disabled={saving}
+              className="px-4 py-2 rounded-lg border border-coral/30 text-sm font-medium text-coral hover:bg-coral/5 transition-all">
+              退回 QA
+            </button>
+          )}
           <button onClick={handleSubmit} disabled={saving}
-            className="px-6 py-2 rounded-lg bg-purple-600 text-sm font-bold text-white hover:bg-purple-500 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-purple-500/20">
-            完成並交付
+            className="px-6 py-2 rounded-lg bg-gold text-sm font-bold text-night hover:bg-gold-light hover:scale-105 active:scale-95 transition-all shadow-lg shadow-gold/20">
+            {me?.is_qa && !me?.is_editor && !me?.is_admin ? '提交給 Editor' : '完成並交付'}
           </button>
         </div>
       </div>
@@ -179,7 +186,7 @@ export default function EditorVerifyPage() {
 
               {/* Right: Editor Input */}
               <div className="flex flex-col gap-2">
-                <div className="relative rounded-xl border border-white/10 bg-white/5 p-4 transition-all focus-within:ring-2 focus-within:ring-purple-400/20 focus-within:border-purple-400/50">
+                <div className="relative rounded-xl border border-white/10 bg-white/5 p-4 transition-all focus-within:ring-2 focus-within:ring-gold/20 focus-within:border-gold/50">
                   <textarea
                     value={seg.translated}
                     onChange={(e) => handleSegmentChange(seg.index, 'translated', e.target.value)}
@@ -191,7 +198,7 @@ export default function EditorVerifyPage() {
                   {/* Raw LLM Reference */}
                   {seg.raw && seg.raw !== seg.translated && (
                     <details className="mt-3 group/raw">
-                      <summary className="text-[10px] text-mist/50 hover:text-purple-400 cursor-pointer list-none flex items-center gap-1 transition-colors">
+                      <summary className="text-[10px] text-mist/50 hover:text-gold cursor-pointer list-none flex items-center gap-1 transition-colors">
                         <svg className="w-3 h-3 group-open/raw:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
@@ -205,12 +212,12 @@ export default function EditorVerifyPage() {
                 </div>
 
                 {/* Editor Comments */}
-                <input
-                  type="text"
+                <textarea
                   value={seg.editor_comments || ''}
                   onChange={(e) => handleSegmentChange(seg.index, 'editor_comments', e.target.value)}
+                  rows={2}
                   placeholder="給 QA 的回饋或修改備註（選填）"
-                  className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:border-purple-400/30 focus:outline-none"
+                  className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:border-gold/30 focus:outline-none resize-none"
                 />
               </div>
             </div>

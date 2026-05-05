@@ -1,10 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, Link } from '@/i18n/routing'
 import { PortalHeader } from '@/components/portal/header'
 import { useAuth } from '@/lib/auth-context'
-import { createOrder, getUploadUrl, uploadFile, confirmUpload } from '@/lib/api'
+import { createOrder, getUploadUrl, uploadFile, confirmUpload, getMe } from '@/lib/api'
 import { useTranslations } from 'next-intl'
+import { extractTextAndCountWords } from '@/lib/file-extractor'
 
 const LANG_OPTIONS = [
   { value: 'tai-lo',     label: '台語（台羅拼音）' },
@@ -19,26 +20,19 @@ const TARGET_LANG_OPTIONS = [
   { value: 'zh-tw', label: '繁體中文' },
 ]
 
-function countWords(text: string): number {
-  const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uac00-\ud7af\u3040-\u30ff]/g) || []).length
-  const latin = text.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uac00-\ud7af\u3040-\u30ff]/g, ' ')
-    .split(/\s+/).filter(w => w.length > 1).length
-  return cjk + latin
-}
-
-async function readFileText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload  = e => resolve((e.target?.result as string) || '')
-    reader.onerror = reject
-    reader.readAsText(file, 'utf-8')
-  })
-}
-
 export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const t = useTranslations('Home')
+  const [userRoles, setUserRoles] = useState<{ is_admin: boolean; is_editor: boolean; is_qa: boolean } | null>(null)
+
+  useEffect(() => {
+    if (user) {
+      getMe().then(me => setUserRoles({ is_admin: me.is_admin, is_editor: me.is_editor, is_qa: me.is_qa })).catch(() => {})
+    } else {
+      setUserRoles(null)
+    }
+  }, [user])
   const [form, setForm]     = useState({ track_type: 'fast', source_lang: 'tai-lo', target_lang: 'en', title: '', notes: '' })
   const [wordCount, setWordCount] = useState(0)
   const [file, setFile]     = useState<File | null>(null)
@@ -62,11 +56,7 @@ export default function HomePage() {
     const f = e.target.files?.[0] || null
     setFile(f)
     if (!f) { setWordCount(0); return }
-    if (f.type.startsWith('text/') || f.name.endsWith('.txt') || f.name.endsWith('.html')) {
-      setWordCount(countWords(await readFileText(f)))
-    } else {
-      setWordCount(Math.round(f.size / 2.5))
-    }
+    setWordCount(await extractTextAndCountWords(f))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -109,6 +99,24 @@ export default function HomePage() {
           </p>
         </div>
       </div>
+
+      {/* Role-based dashboard links */}
+      {user && userRoles && (userRoles.is_admin || userRoles.is_editor || userRoles.is_qa) && (
+        <div style={{ padding: '0 1rem' }}>
+          <div className="page-container" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '1rem' }}>
+            {userRoles.is_admin && (
+              <Link href="/admin" className="btn btn-primary" style={{ padding: '0.5rem 1.5rem' }}>
+                管理後台
+              </Link>
+            )}
+            {(userRoles.is_editor || userRoles.is_qa) && (
+              <Link href="/editor" className="btn btn-outline" style={{ padding: '0.5rem 1.5rem', borderColor: 'var(--gold)', color: 'var(--gold)' }}>
+                審閱後台
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Content grid */}
       <div style={{ padding: '0 1rem 4rem' }}>

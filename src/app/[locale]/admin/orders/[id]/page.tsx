@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetOrder, adminGetDownloadUrl, confirmPayment, markDelivered, adminListQaFlags,
-  adminUpdateOrderStatus, adminListUsers, adminAssignEditor,
+  adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate,
   Order, QAFlag, QAResult, UserAccount
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
@@ -75,12 +75,24 @@ export default function AdminOrderDetailPage() {
   const [tick,        setTick]        = useState(0)
   const [downloadUrl, setDownloadUrl] = useState('')
   const [editors,     setEditors]     = useState<UserAccount[]>([])
+  const [qas,         setQas]         = useState<UserAccount[]>([])
   const [assigning,   setAssigning]   = useState(false)
 
   async function handleUpdateStatus(newStatus: string) {
     if (!confirm(`確定將訂單狀態改為 ${newStatus}？`)) return
     try {
       await adminUpdateOrderStatus(id, newStatus)
+      setTick(t => t + 1)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function handleRetranslate() {
+    if (!confirm('確定重新觸發翻譯？這將清除現有譯文並從頭開始翻譯流程。')) return
+    try {
+      await adminRetranslate(id)
+      alert('翻譯流程已重新觸發')
       setTick(t => t + 1)
     } catch (e: any) {
       alert(e.message)
@@ -112,18 +124,26 @@ export default function AdminOrderDetailPage() {
       }
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
 
-    // 獨立獲取 Editor 列表用於指派
-    adminListUsers().then(d => {
+    // 獨立獲取符合該訂單語言要求的 Editor / QA 列表用於指派
+    adminListEligibleUsers(id).then(d => {
       setEditors(d.users.filter(u => u.is_editor))
+      setQas(d.users.filter(u => u.is_qa))
     }).catch(() => {})
   }, [id, tick])
 
 
-  async function handleAssignEditor(editorId: string) {
+  async function handleAssign(editorId?: string, qaId?: string) {
     setAssigning(true)
     try {
-      await adminAssignEditor(id, editorId || null)
-      setOrder(o => o ? { ...o, editor_id: editorId || undefined } : o)
+      await adminAssignEditor(id, { 
+        editor_id: editorId ?? order?.editor_id ?? null,
+        qa_id: qaId ?? order?.qa_id ?? null
+      })
+      setOrder(o => o ? { 
+        ...o, 
+        editor_id: editorId ?? o.editor_id,
+        qa_id: qaId ?? o.qa_id 
+      } : o)
     } catch (e: any) {
       alert(e.message)
     } finally {
@@ -169,6 +189,8 @@ export default function AdminOrderDetailPage() {
     </div>
   )
 
+  const isDelivered = order.status === 'delivered'
+
   const rows: [string, React.ReactNode][] = [
     ['訂單 ID',   <span key="id" className="text-xs font-mono text-mist">{order.id}</span>],
     ['標題',      <span key="ti" className="text-base">{order.title || '—'}</span>],
@@ -187,16 +209,31 @@ export default function AdminOrderDetailPage() {
       <div key="ed" className="flex items-center gap-2">
         <select
           value={order.editor_id || ''}
-          onChange={e => handleAssignEditor(e.target.value)}
-          disabled={assigning}
-          className="rounded bg-white/10 border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-gold"
+          onChange={e => handleAssign(e.target.value || undefined)}
+          disabled={assigning || isDelivered}
+          className="rounded bg-white/10 border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-gold disabled:opacity-40"
         >
-          <option value="">未指派</option>
+          <option value="" className="bg-night text-paper">未指派</option>
           {editors.map(e => (
-            <option key={e.id} value={e.id}>{e.email || e.id.slice(-8)}</option>
+            <option key={e.id} value={e.id} className="bg-night text-paper">{e.email || e.id.slice(-8)}</option>
           ))}
         </select>
-        {assigning && <div className="w-3 h-3 border border-gold/30 border-t-gold rounded-full animate-spin" />}
+      </div>
+    )],
+    ['指派 QA', (
+      <div key="qa" className="flex items-center gap-2">
+        <select
+          value={order.qa_id || ''}
+          onChange={e => handleAssign(undefined, e.target.value || undefined)}
+          disabled={assigning || isDelivered}
+          className="rounded bg-white/10 border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
+        >
+          <option value="" className="bg-night text-paper">未指派</option>
+          {qas.map(e => (
+            <option key={e.id} value={e.id} className="bg-night text-paper">{e.email || e.id.slice(-8)}</option>
+          ))}
+        </select>
+        {assigning && <div className="w-3 h-3 border border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />}
       </div>
     )],
   ]
@@ -224,7 +261,7 @@ export default function AdminOrderDetailPage() {
 
       {/* QA Review Action */}
       <div className="flex gap-3">
-        {order.status === 'qa_review' && (
+        {['qa_review', 'editor_verify'].includes(order.status) && (
           <Link href={`/admin/orders/${order.id}/review`}
             className="flex-1 px-4 py-3 rounded-xl bg-gold text-white font-bold text-center hover:bg-gold/90 transition-all shadow-lg shadow-gold/20">
             進入 QA 審閱編輯器
@@ -234,6 +271,12 @@ export default function AdminOrderDetailPage() {
           <button onClick={() => handleUpdateStatus('qa_review')}
             className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-mist text-sm hover:text-paper hover:bg-white/10 transition-all">
             重啟 QA 審閱 (由已交付改回)
+          </button>
+        )}
+        {['qa_review', 'delivered', 'nmt_failed', 'qa_failed'].includes(order.status) && (
+          <button onClick={handleRetranslate}
+            className="flex-1 px-4 py-3 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 text-sm hover:bg-amber-400/20 transition-all">
+            重新翻譯
           </button>
         )}
       </div>

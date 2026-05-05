@@ -16,32 +16,25 @@ function Icon({ path, path2 }: { path: string; path2?: string }) {
   )
 }
 
-const NAV = [
-  {
-    href: '/editor/orders',
-    label: '待審閱訂單',
-    icon: <Icon path="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />,
-  },
-]
-
 export default function EditorLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [isEditor, setIsEditor] = useState(false)
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         router.push('/login')
       } else {
-        // 確認是否有 editor 權限
         getMe().then(me => {
-          if (!me.is_editor && !me.is_admin) {
-            alert('您沒有 Editor 權限')
+          if (!me.is_editor && !me.is_qa && !me.is_admin) {
+            alert('您沒有 Editor 或 QA 權限')
             router.push('/')
           } else {
+            setIsEditor(me.is_editor || me.is_admin)
             setChecking(false)
           }
         }).catch(() => {
@@ -50,6 +43,19 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
       }
     }
   }, [user, loading, router])
+
+  const NAV = [
+    {
+      href: '/editor/orders',
+      label: '待審閱訂單',
+      icon: <Icon path="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />,
+    },
+    ...(isEditor ? [{
+      href: '/editor/team',
+      label: '我的團隊',
+      icon: <Icon path="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+    }] : []),
+  ]
 
   if (loading || checking) return (
     <div className="min-h-screen bg-ink flex items-center justify-center">
@@ -67,7 +73,7 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
       )}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <span className="font-display font-bold text-base">
-            木典 <span className="text-purple-400">Editor</span>
+            木典 <span className="text-gold">Editor</span>
           </span>
           <button className="md:hidden text-mist" onClick={() => setOpen(false)}>✕</button>
         </div>
@@ -79,7 +85,7 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
               className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all',
                 pathname === n.href
-                  ? 'bg-purple-500/20 text-purple-400 font-medium'
+                  ? 'bg-gold/20 text-gold font-medium'
                   : 'text-paper/60 hover:bg-white/5 hover:text-paper'
               )}>
               {n.icon}

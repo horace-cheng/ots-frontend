@@ -2,12 +2,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  adminGetOrder, adminGetSegments, adminUpdateSegments, adminMarkQaDone,
-  Order, QASegment,
+  editorGetOrder, editorGetSegments, editorUpdateSegments, editorSubmit,
+  Order, QASegment, getMe
 } from '@/lib/api'
 import QaReviewEditor from '@/components/qa-review-editor'
 
-export default function QaReviewEditorPage() {
+export default function QaReviewPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
@@ -18,14 +18,22 @@ export default function QaReviewEditorPage() {
 
   useEffect(() => {
     setBusy(true)
-    Promise.all([
-      adminGetOrder(id),
-      adminGetSegments(id),
-    ]).then(([o, s]) => {
-      setOrder(o)
-      setSegments(s.segments)
-    }).catch(e => setError(e.message)).finally(() => setBusy(false))
-  }, [id])
+    getMe().then(user => {
+      if (!user.is_qa) {
+        router.replace(`/editor/orders/${id}/verify`)
+        return null
+      }
+      return Promise.all([
+        editorGetOrder(id),
+        editorGetSegments(id),
+      ]).then(([o, s]) => {
+        setOrder(o)
+        setSegments(s.segments)
+      })
+    }).catch(e => {
+      if (e.message !== 'NEXT_REDIRECT') setError(e.message)
+    }).finally(() => setBusy(false))
+  }, [id, router])
 
   if (busy) return (
     <div className="flex items-center justify-center py-20">
@@ -41,22 +49,22 @@ export default function QaReviewEditorPage() {
     <QaReviewEditor
       order={order}
       segments={segments}
-      backHref={`/admin/orders/${id}`}
-      isReadOnly={order.status === 'delivered'}
+      backHref="/editor/orders"
       accent="gold"
       onSegmentsChange={(updated) => setSegments(updated)}
       onSaveDraft={async () => {
-        await adminUpdateSegments(id, segments.map(s => ({
+        await editorUpdateSegments(id, segments.map(s => ({
           index: s.index,
           translated: s.translated,
           comments: s.comments,
         })))
       }}
       onSubmit={async () => {
-        await adminMarkQaDone(id)
-        alert('審閱完成，訂單已交付')
-        router.push(`/admin/orders/${id}`)
+        await editorSubmit(id)
+        alert('已提交給 Editor')
+        router.push('/editor/orders')
       }}
+      submitLabel="提交給 Editor"
     />
   )
 }

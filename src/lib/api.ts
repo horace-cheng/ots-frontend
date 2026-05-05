@@ -6,16 +6,30 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  noAuth = false,
+  params?: Record<string, string | number | undefined> | boolean,
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const noAuth = typeof params === 'boolean' ? params : false
+  const queryParams = typeof params === 'object' && params !== null && !Array.isArray(params) ? params : undefined
 
   if (!noAuth) {
     const token = await getIdToken()
     if (token) headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  let url = `${BASE}${path}`
+  if (queryParams) {
+    const qs = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(queryParams)
+          .filter(([_, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      )
+    ).toString()
+    if (qs) url += `?${qs}`
+  }
+
+  const res = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
@@ -134,13 +148,25 @@ export const adminMarkQaDone = (id: string) =>
 export const adminUpdateOrderStatus = (id: string, status: string) =>
   request<{ message: string }>('PATCH', `/admin/orders/${id}/status?status=${status}`)
 
-export const adminAssignEditor = (order_id: string, editor_id: string | null) =>
-  request<{ message: string }>('PATCH', `/admin/orders/${order_id}/assign-editor`, { editor_id })
+export const adminRetranslate = (id: string) =>
+  request<{ message: string }>('POST', `/admin/orders/${id}/retranslate`)
+
+export const adminAssignEditor = (order_id: string, data: { editor_id: string | null; qa_id: string | null }) =>
+  request<MessageResponse>('PATCH', `/admin/orders/${order_id}/assign-editor`, data)
+
+export const adminUpdateUserLanguages = (user_id: string, languages: { source_lang: string; target_lang: string }[]) =>
+  request<MessageResponse>('PUT', `/admin/users/${user_id}/languages`, { languages })
+
+export const adminListEligibleUsers = (order_id: string) =>
+  request<{ users: UserAccount[]; total: number }>('GET', `/admin/orders/${order_id}/eligible-users`)
 
 
 // ── Editor ────────────────────────────────────────────────────────────────────
-export const editorListOrders = () =>
-  request<{ orders: Order[]; total: number }>('GET', '/editor/orders')
+export const editorListOrders = (params?: { limit?: number; offset?: number }) =>
+  request<{ orders: Order[]; total: number }>('GET', '/editor/orders', undefined, params)
+
+export const editorListTeam = () =>
+  request<{ users: UserAccount[]; total: number }>('GET', '/editor/team')
 
 export const editorGetOrder = (id: string) =>
   request<Order>('GET', `/editor/orders/${id}`)
@@ -157,6 +183,9 @@ export const editorSubmit = (id: string) =>
 export const editorReturn = (id: string) =>
   request<{ message: string }>('POST', `/editor/orders/${id}/return`)
 
+export const editorAssignQa = (order_id: string, qa_id: string | null) =>
+  request<{ message: string }>('PATCH', `/editor/orders/${order_id}/assign-qa`, { qa_id })
+
 export const listAssignments = (params?: { status?: string; limit?: number; offset?: number }) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
@@ -172,7 +201,17 @@ export const updateAssignment = (order_id: string, data: { editor_id?: string; p
 export const getMe = () =>
   request<UserProfile>('GET', '/users/me')
 
+export const createInvitation = (data: { email: string; role: 'editor' | 'qa' }) =>
+  request<{ id: string; token: string }>('POST', '/users/invite', data)
+
+export const acceptInvitation = (token: string) =>
+  request<{ message: string }>('POST', '/users/accept-invite', { token })
+
 // ── Types ─────────────────────────────────────────────────────────────────────
+export interface MessageResponse {
+  message: string
+}
+
 export interface Order {
   id: string
   track_type: string
@@ -190,6 +229,8 @@ export interface Order {
   invoice_no?: string
   gcs_output_path?: string
   editor_id?: string
+  qa_id?: string
+  qa_submitted_at?: string
 }
 
 export interface UserProfile {
@@ -201,6 +242,8 @@ export interface UserProfile {
   invoice_carrier?: string
   is_admin:        boolean
   is_editor:       boolean
+  is_qa:           boolean
+  roles:           string[]
   created_at:      string
 }
 
@@ -234,6 +277,8 @@ export interface UserAccount {
   created_at: string
   is_admin: boolean
   is_editor: boolean
+  is_qa: boolean
+  languages: { source_lang: string; target_lang: string }[]
   admin_role?: string
 }
 
