@@ -202,7 +202,7 @@ export default function HomePage() {
 
               <div style={{ marginBottom: '0.75rem' }}>
                 <label className="field-label">上傳原文檔案</label>
-                <input type="file" accept=".txt,.docx,.pdf,.html" onChange={handleFileChange}
+                <input type="file" accept=".txt,.docx,.pdf" onChange={handleFileChange}
                   style={{ display: 'block', width: '100%', fontSize: '0.8rem', color: '#64748b', cursor: 'pointer', padding: '0.375rem 0' }} />
                 {file && (
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', alignItems: 'center' }}>
