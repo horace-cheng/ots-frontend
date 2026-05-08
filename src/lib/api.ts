@@ -64,6 +64,9 @@ export const listOrders = (params?: { status?: string; track_type?: string; limi
 export const cancelOrder = (id: string) =>
   request<{ message: string }>('DELETE', `/orders/${id}`)
 
+export const adminCancelOrder = (id: string) =>
+  request<{ message: string }>('DELETE', `/admin/orders/${id}`)
+
 // ── Files ─────────────────────────────────────────────────────────────────────
 export const getUploadUrl = (data: { order_id: string; filename: string; content_type: string }) =>
   request<{ signed_url: string; gcs_path: string }>('POST', '/files/upload-url', data)
@@ -73,6 +76,19 @@ export const confirmUpload = (order_id: string, gcs_path: string) =>
 
 export const getDownloadUrl = (order_id: string) =>
   request<{ signed_url: string }>('GET', `/files/${order_id}/download-url`)
+
+// ── Support Files (Literary Track) ────────────────────────────────────────────
+export const getSupportUploadUrl = (order_id: string, filename: string, content_type: string = 'text/plain') =>
+  request<{ signed_url: string; gcs_path: string }>('POST', `/files/${order_id}/support-upload-url`, undefined,
+    { filename, content_type })
+
+export const confirmSupportUpload = (order_id: string, data: {
+  filename: string; content_type: string; file_size: number; gcs_path: string; file_role: string
+}) =>
+  request<SupportFile>('POST', `/files/${order_id}/support-confirm`, undefined, data)
+
+export const listSupportFiles = (order_id: string) =>
+  request<{ files: SupportFile[]; total: number }>('GET', `/files/${order_id}/support-files`)
 
 export async function uploadFile(
   signedUrl: string,
@@ -189,6 +205,25 @@ export const editorReturn = (id: string) =>
 export const editorAssignQa = (order_id: string, qa_id: string | null) =>
   request<{ message: string }>('PATCH', `/editor/orders/${order_id}/assign-qa`, { qa_id })
 
+// ── Literary Track: Editor/Proofreader Portal ───────────────────────────────
+export const ltListAssignments = (params?: { limit?: number; offset?: number }) =>
+  request<{ assignments: Assignment[]; total: number }>('GET', '/editor/lt/assignments', undefined, params)
+
+export const ltGetOrder = (id: string, role: 'editor' | 'proofreader') =>
+  request<Order>('GET', `/editor/lt/orders/${id}`, undefined, { role })
+
+export const ltGetSegments = (id: string, role: 'editor' | 'proofreader') =>
+  request<{ segments: QASegment[] }>('GET', `/editor/lt/orders/${id}/segments`, undefined, { role })
+
+export const ltUpdateSegments = (id: string, role: 'editor' | 'proofreader', segments: QASegmentUpdate[]) =>
+  request<{ message: string }>('PATCH', `/editor/lt/orders/${id}/segments`, { segments }, { role })
+
+export const ltCompleteAssignment = (id: string, role: 'editor' | 'proofreader') =>
+  request<{ message: string }>('POST', `/editor/lt/orders/${id}/complete`, undefined, { role })
+
+export const ltRejectAssignment = (id: string, role: 'editor' | 'proofreader', notes: string) =>
+  request<{ message: string }>('POST', `/editor/lt/orders/${id}/reject`, { notes }, { role })
+
 export const listAssignments = (params?: { status?: string; limit?: number; offset?: number }) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params || {}).map(([k, v]) => [k, String(v)]))
@@ -198,6 +233,16 @@ export const listAssignments = (params?: { status?: string; limit?: number; offs
 
 export const updateAssignment = (order_id: string, data: { editor_id?: string; proofreader_id?: string }) =>
   request<Assignment>('PATCH', `/admin/assignments/${order_id}`, data)
+
+export const adminAssignLiteraryRole = (order_id: string, role: 'editor' | 'proofreader', user_id: string) =>
+  request<Assignment>('POST', `/admin/assignments/${order_id}`, { role, user_id })
+
+export const adminCompleteLiteraryRole = (order_id: string, role: 'editor' | 'proofreader') =>
+  request<Assignment>('POST', `/admin/assignments/${order_id}/complete`, { role })
+
+// ── Literary Track Quotation ─────────────────────────────────────────────────
+export const adminUpdateQuote = (order_id: string, data: { quoted_price: number; admin_notes?: string }) =>
+  request<{ message: string }>('POST', `/admin/orders/${order_id}/quote`, data)
 
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -223,6 +268,9 @@ export interface Order {
   target_lang: string
   word_count: number
   price_ntd: number
+  quoted_price?: number
+  reference_price?: number
+  quoted_at?: string
   title?: string
   notes?: string
   created_at: string
@@ -234,7 +282,9 @@ export interface Order {
   gcs_upload_path?: string
   editor_id?: string
   qa_id?: string
-  qa_submitted_at?: string
+  proofreader_id?: string
+  assignment_status?: string
+  proofreader_notes?: string
 }
 
 export interface UserProfile {
@@ -290,11 +340,26 @@ export interface Assignment {
   id: string
   order_id: string
   editor_id?: string
+  qa_id?: string
   proofreader_id?: string
   status: string
   assigned_at: string
   editor_submitted_at?: string
   proofread_submitted_at?: string
+  qa_submitted_at?: string
+  editor_notes?: string
+  proofreader_notes?: string
+}
+
+export interface SupportFile {
+  id: string
+  order_id: string
+  filename: string
+  content_type: string
+  file_size: number
+  gcs_path: string
+  file_role: string
+  created_at: string
 }
 
 export interface QASegment {
@@ -304,6 +369,7 @@ export interface QASegment {
   raw?:           string
   comments?:      string
   editor_comments?: string
+  proofreader_comments?: string
   flags:          QAFlag[]
 }
 
@@ -312,4 +378,5 @@ export interface QASegmentUpdate {
   translated: string
   comments?:  string
   editor_comments?: string
+  proofreader_comments?: string
 }

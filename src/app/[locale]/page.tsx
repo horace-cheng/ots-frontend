@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, Link } from '@/i18n/routing'
 import { PortalHeader } from '@/components/portal/header'
 import { useAuth } from '@/lib/auth-context'
-import { createOrder, getUploadUrl, uploadFile, confirmUpload, getMe } from '@/lib/api'
+import { createOrder, getUploadUrl, uploadFile, confirmUpload, getMe,
+  getSupportUploadUrl, confirmSupportUpload } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { extractTextAndCountWords } from '@/lib/file-extractor'
 
@@ -19,6 +20,11 @@ const TARGET_LANG_OPTIONS = [
   { value: 'ko',    label: '한국어' },
   { value: 'zh-tw', label: '繁體中文' },
 ]
+
+interface SupportFile {
+  file: File
+  role: 'reference' | 'glossary' | 'style_guide' | 'background' | 'other'
+}
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -42,13 +48,24 @@ export default function HomePage() {
   const [busy, setBusy]     = useState(false)
   const [orderId, setOrderId] = useState('')
   const [price, setPrice]   = useState(0)
+  const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const isLT = form.track_type === 'literary'
+  const prevTrack = form.track_type
 
-  const estimatedPrice = wordCount > 0
+  const set = (k: string, v: string) => {
+    if (k === 'track_type' && v !== prevTrack) {
+      setWordCount(0)
+      setFile(null)
+      setSupportFiles([])
+    }
+    setForm(f => ({ ...f, [k]: v }))
+  }
+
+  const estimatedPrice = !isLT && wordCount > 0
     ? Math.max(
-        Math.round(wordCount * (form.track_type === 'fast' ? 2 : 6) * (form.target_lang === 'ja' ? 1.2 : 1)),
-        form.track_type === 'fast' ? 2000 : 20000
+        Math.round(wordCount * 2 * (form.target_lang === 'ja' ? 1.2 : 1)),
+        2000
       )
     : 0
 
@@ -59,6 +76,25 @@ export default function HomePage() {
     setWordCount(await extractTextAndCountWords(f))
   }
 
+  async function handleSupportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+    const newFiles: SupportFile[] = Array.from(files).map(f => ({
+      file: f,
+      role: 'reference',
+    }))
+    setSupportFiles(prev => [...prev, ...newFiles])
+    e.target.value = ''
+  }
+
+  function removeSupportFile(index: number) {
+    setSupportFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function updateSupportFileRole(index: number, role: SupportFile['role']) {
+    setSupportFiles(prev => prev.map((sf, i) => i === index ? { ...sf, role } : sf))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user) { router.push('/login'); return }
@@ -67,9 +103,30 @@ export default function HomePage() {
     try {
       const order = await createOrder({ ...form, title: form.title.trim() || undefined, word_count: wordCount || 1 })
       setOrderId(order.order_id); setPrice(order.price_ntd); setStep('upload')
+
+      // Upload main file
       const { signed_url, gcs_path } = await getUploadUrl({ order_id: order.order_id, filename: file.name, content_type: file.type || 'text/plain' })
       await uploadFile(signed_url, file, setProgress)
       await confirmUpload(order.order_id, gcs_path)
+
+      // Upload support files (LT only)
+      if (isLT && supportFiles.length > 0) {
+        for (let i = 0; i < supportFiles.length; i++) {
+          const sf = supportFiles[i]
+          const { signed_url: sfUrl, gcs_path: sfPath } = await getSupportUploadUrl(
+            order.order_id, sf.file.name, sf.file.type || 'text/plain'
+          )
+          await uploadFile(sfUrl, sf.file)
+          await confirmSupportUpload(order.order_id, {
+            filename: sf.file.name,
+            content_type: sf.file.type || 'text/plain',
+            file_size: sf.file.size,
+            gcs_path: sfPath,
+            file_role: sf.role,
+          })
+        }
+      }
+
       setStep('confirm')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '發生錯誤，請稍後再試')
@@ -128,25 +185,48 @@ export default function HomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {[
                 { id: 'fast',     name: 'Fast Track',    sub: '48 小時', desc: '學術文獻・新聞・商務文件，AI 輔助 + QA 審閱', rate: 'NT$2/字起' },
-                { id: 'literary', name: 'Literary Track', sub: '文學精譯', desc: '詩集・小說・劇本，母語文學編輯全程參與',      rate: 'NT$6/字起' },
-              ].map(t => (
-                <div key={t.id} onClick={() => set('track_type', t.id)} style={{
-                  background: form.track_type === t.id ? 'white' : 'rgba(255,255,255,0.5)',
-                  border: `2px solid ${form.track_type === t.id ? 'var(--gold)' : 'rgba(26,26,46,0.1)'}`,
+                { id: 'literary', name: 'Literary Track', sub: '文學精譯', desc: '詩集・小說・劇本，母語文學編輯全程參與，可附參考文件', rate: '報價制' },
+              ].map(track => (
+                <div key={track.id} onClick={() => set('track_type', track.id)} style={{
+                  background: form.track_type === track.id ? 'white' : 'rgba(255,255,255,0.5)',
+                  border: `2px solid ${form.track_type === track.id ? (track.id === 'literary' ? '#7c3aed' : 'var(--gold)') : 'rgba(26,26,46,0.1)'}`,
                   borderRadius: 12, padding: '1rem', cursor: 'pointer', transition: 'all 0.15s',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                     <div>
-                      <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--mist)', marginLeft: '0.5rem' }}>{t.sub}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{track.name}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--mist)', marginLeft: '0.5rem' }}>{track.sub}</span>
                     </div>
-                    <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${form.track_type === t.id ? 'var(--gold)' : '#d1d5db'}`, background: form.track_type === t.id ? 'var(--gold)' : 'white', flexShrink: 0 }} />
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${form.track_type === track.id ? (track.id === 'literary' ? '#7c3aed' : 'var(--gold)') : '#d1d5db'}`, background: form.track_type === track.id ? (track.id === 'literary' ? '#7c3aed' : 'var(--gold)') : 'white', flexShrink: 0 }} />
                   </div>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5, marginBottom: '0.4rem' }}>{t.desc}</p>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gold)' }}>{t.rate}</p>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5, marginBottom: '0.4rem' }}>{track.desc}</p>
+                  <p style={{ fontSize: '0.75rem', fontWeight: 600, color: track.id === 'literary' ? '#7c3aed' : 'var(--gold)' }}>{track.rate}</p>
                 </div>
               ))}
             </div>
+
+            {/* Track-specific info callout */}
+            {isLT && (
+              <div style={{ marginTop: '0.75rem', background: '#f5f3ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: '0.75rem' }}>
+                <p style={{ fontSize: '0.78rem', color: '#6d28d9', fontWeight: 600, marginBottom: '0.3rem' }}>Literary Track 流程</p>
+                <ol style={{ fontSize: '0.72rem', color: '#7c3aed', lineHeight: 1.8, margin: 0, paddingLeft: '1.2rem' }}>
+                  <li>送出訂單與檔案</li>
+                  <li>管理員審閱並提供報價</li>
+                  <li>您確認報價並付款</li>
+                  <li>編輯與校對開始翻譯</li>
+                </ol>
+              </div>
+            )}
+            {!isLT && (
+              <div style={{ marginTop: '0.75rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '0.75rem' }}>
+                <p style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 600, marginBottom: '0.3rem' }}>Fast Track 流程</p>
+                <ol style={{ fontSize: '0.72rem', color: '#78350f', lineHeight: 1.8, margin: 0, paddingLeft: '1.2rem' }}>
+                  <li>送出訂單，線上付款</li>
+                  <li>AI 翻譯 + QA 審閱</li>
+                  <li>48 小時內交付</li>
+                </ol>
+              </div>
+            )}
           </div>
 
           {/* Form / Confirm */}
@@ -157,24 +237,48 @@ export default function HomePage() {
               </div>
               <h2 className="font-display" style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>訂單已建立</h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--mist)', marginBottom: '0.25rem' }}>訂單編號：<code>{orderId.slice(-8).toUpperCase()}</code></p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--mist)', marginBottom: '1.5rem' }}>金額：NT${price.toLocaleString()}</p>
-              <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#92400e', marginBottom: '0.4rem' }}>付款資訊（銀行匯款）</p>
-                <p style={{ fontSize: '0.75rem', color: '#78350f', lineHeight: 1.8 }}>
-                  玉山銀行（808）信義分行<br />
-                  戶名：木典股份有限公司<br />
-                  金額：NT${price.toLocaleString()}<br />
-                  備注：{orderId.slice(-8).toUpperCase()}
-                </p>
-              </div>
+              {isLT ? (
+                <div style={{ background: '#f5f3ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
+                  <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6d28d9', marginBottom: '0.4rem' }}>報價處理中</p>
+                  <p style={{ fontSize: '0.75rem', color: '#7c3aed', lineHeight: 1.7 }}>
+                    Literary Track 訂單需由管理員審閱後提供報價。<br />
+                    請至「我的訂單」查看狀態，報價後即可付款。
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--mist)', marginBottom: '1.5rem' }}>金額：NT${price.toLocaleString()}</p>
+                  <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
+                    <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#92400e', marginBottom: '0.4rem' }}>付款資訊（銀行匯款）</p>
+                    <p style={{ fontSize: '0.75rem', color: '#78350f', lineHeight: 1.8 }}>
+                      玉山銀行（808）信義分行<br />
+                      戶名：木典股份有限公司<br />
+                      金額：NT${price.toLocaleString()}<br />
+                      備注：{orderId.slice(-8).toUpperCase()}
+                    </p>
+                  </div>
+                </>
+              )}
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                 <Link href={`/orders/${orderId}`} className="btn btn-primary">查看訂單</Link>
                 <Link href="/orders" className="btn btn-outline">我的訂單</Link>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="card">
-              <p style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: '1rem' }}>建立翻譯訂單</p>
+            <form onSubmit={handleSubmit} className="card" style={{ borderTop: `3px solid ${isLT ? '#7c3aed' : 'var(--gold)'}` }}>
+              <p style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isLT ? (
+                  <>
+                    <span style={{ background: '#7c3aed', color: 'white', fontSize: '0.65rem', padding: '0.15rem 0.5rem', borderRadius: 6 }}>LT</span>
+                    文學翻譯訂單
+                  </>
+                ) : (
+                  <>
+                    <span style={{ background: 'var(--gold)', color: 'white', fontSize: '0.65rem', padding: '0.15rem 0.5rem', borderRadius: 6 }}>FT</span>
+                    快速翻譯訂單
+                  </>
+                )}
+              </p>
 
               {step === 'upload' && (
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem' }}>
@@ -207,12 +311,22 @@ export default function HomePage() {
                 {file && (
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', color: 'var(--mist)' }}>{file.name} ({Math.round(file.size / 1024)} KB)</span>
-                    {wordCount > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--gold)' }}>≈ {wordCount.toLocaleString()} 字</span>}
+                    {wordCount > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isLT ? '#7c3aed' : 'var(--gold)' }}>≈ {wordCount.toLocaleString()} 字</span>}
                   </div>
                 )}
               </div>
 
-              {estimatedPrice > 0 && (
+              {isLT && wordCount > 0 && (
+                <div style={{ background: '#f5f3ff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 600 }}>字數已計算</span>
+                    <span style={{ fontSize: '0.8rem', color: '#7c3aed' }}>{wordCount.toLocaleString()} 字</span>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#8b5cf6', marginTop: '0.2rem' }}>報價將在管理員審閱後提供</p>
+                </div>
+              )}
+
+              {!isLT && estimatedPrice > 0 && (
                 <div style={{ background: 'rgba(184,133,42,0.07)', border: '1px solid rgba(184,133,42,0.2)', borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>預估報價</span>
@@ -222,24 +336,57 @@ export default function HomePage() {
                 </div>
               )}
 
+              {/* LT Support Files */}
+              {isLT && (
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <label className="field-label">參考文件（選填）</label>
+                  <p style={{ fontSize: '0.7rem', color: '#64748b', marginBottom: '0.4rem' }}>可上傳詞彙表、風格指南、背景資料等，幫助提升翻譯品質</p>
+                  <input type="file" multiple accept=".txt,.docx,.pdf,.xlsx,.csv" onChange={handleSupportFileChange}
+                    style={{ display: 'block', width: '100%', fontSize: '0.8rem', color: '#64748b', cursor: 'pointer', padding: '0.375rem 0' }} />
+                  {supportFiles.length > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {supportFiles.map((sf, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f5f3ff', borderRadius: 6, padding: '0.4rem 0.5rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#7c3aed', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {sf.file.name} ({Math.round(sf.file.size / 1024)} KB)
+                          </span>
+                          <select
+                            value={sf.role}
+                            onChange={e => updateSupportFileRole(i, e.target.value as SupportFile['role'])}
+                            style={{ fontSize: '0.65rem', border: '1px solid #e9d5ff', borderRadius: 4, padding: '0.2rem', color: '#6d28d9', background: 'white' }}
+                          >
+                            <option value="reference">參考</option>
+                            <option value="glossary">詞彙表</option>
+                            <option value="style_guide">風格指南</option>
+                            <option value="background">背景資料</option>
+                            <option value="other">其他</option>
+                          </select>
+                          <button type="button" onClick={() => removeSupportFile(i)} style={{ fontSize: '0.7rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '0.1rem 0.3rem' }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{ marginBottom: '0.75rem' }}>
                 <label className="field-label">訂單標題（選填）</label>
-                <input type="text" maxLength={50} placeholder="不填則自動產生，例：台語 → English 快速翻譯"
+                <input type="text" maxLength={50} placeholder={isLT ? '例：台語 → English 文學翻譯' : '不填則自動產生，例：台語 → English 快速翻譯'}
                   className="field" value={form.title}
                   onChange={e => set('title', e.target.value)} />
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
                 <label className="field-label">備注（選填）</label>
-                <textarea rows={2} placeholder="術語偏好、特殊要求…" className="field" style={{ resize: 'none' }}
+                <textarea rows={2} placeholder={isLT ? '文體風格偏好、目标讀者、術語建議…' : '術語偏好、特殊要求…'} className="field" style={{ resize: 'none' }}
                   value={form.notes} onChange={e => set('notes', e.target.value)} />
               </div>
 
               {error && <p style={{ fontSize: '0.8rem', color: 'var(--coral)', marginBottom: '0.75rem' }}>{error}</p>}
 
               {user ? (
-                <button type="submit" disabled={busy} className="btn btn-gold" style={{ width: '100%', padding: '0.7rem' }}>
-                  {busy ? '處理中…' : '送出訂單'}
+                <button type="submit" disabled={busy} className="btn btn-gold" style={{ width: '100%', padding: '0.7rem', background: isLT ? '#7c3aed' : undefined }}>
+                  {busy ? '處理中…' : (isLT ? '送出訂單（等待報價）' : '送出訂單')}
                 </button>
               ) : (
                 <Link href="/login" className="btn btn-primary" style={{ width: '100%', padding: '0.7rem', textAlign: 'center' }}>

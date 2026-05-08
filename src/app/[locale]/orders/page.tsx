@@ -42,6 +42,8 @@ export default function OrdersPage() {
 
   const FILTERS = [
     { value: '', label: '全部' },
+    { value: 'awaiting_quote',  label: '待報價' },
+    { value: 'quoted',          label: '已報價' },
     { value: 'pending_payment', label: '待付款' },
     { value: 'processing',      label: '翻譯中' },
     { value: 'delivered',       label: '已交付' },

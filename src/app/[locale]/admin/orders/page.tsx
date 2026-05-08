@@ -33,6 +33,8 @@ export default function AdminOrdersPage() {
 
   const STATUS_FILTERS = [
     { v: '', l: '全部' },
+    { v: 'awaiting_quote', l: '待報價' },
+    { v: 'quoted', l: '已報價' },
     { v: 'pending_payment', l: '待付款' },
     { v: 'paid', l: '已付款' },
     { v: 'processing', l: '翻譯中' },
@@ -106,7 +108,7 @@ export default function AdminOrdersPage() {
                 <td className="px-4 py-3 text-sm text-mist whitespace-nowrap">
                   <LangLabel code={o.source_lang} /> → <LangLabel code={o.target_lang} />
                 </td>
-                <td className="px-4 py-3 text-sm font-medium text-paper">NT${o.price_ntd.toLocaleString()}</td>
+                <td className="px-4 py-3 text-sm font-medium text-paper">NT${(o.quoted_price || o.price_ntd).toLocaleString()}</td>
                 <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                 <td className="px-4 py-3 text-sm text-mist">{dayjs(o.created_at).format('MM/DD HH:mm')}</td>
                 <td className="px-4 py-3">
@@ -119,6 +121,12 @@ export default function AdminOrdersPage() {
                       <Link href={`/admin/orders/${o.id}/review`}
                         className="text-sm text-paper bg-gold/20 px-2 py-0.5 rounded hover:bg-gold/30 transition-colors">
                         QA 審閱
+                      </Link>
+                    )}
+                    {o.status === 'awaiting_quote' && o.track_type === 'literary' && (
+                      <Link href={`/admin/orders/${o.id}`}
+                        className="text-sm text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded hover:bg-purple-500/30 transition-colors">
+                        報價
                       </Link>
                     )}
                   </div>

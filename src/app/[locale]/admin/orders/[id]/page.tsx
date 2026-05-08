@@ -4,7 +4,8 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetOrder, adminGetDownloadUrl, adminGetOriginalContent, confirmPayment, markDelivered, adminListQaFlags,
-  adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate,
+  adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminUpdateQuote,
+  adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
   Order, QAFlag, QAResult, UserAccount
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
@@ -110,6 +111,11 @@ export default function AdminOrderDetailPage() {
   const [gcsPath,     setGcsPath]     = useState('')
   const [deliverBusy, setDeliverBusy] = useState(false)
 
+  // quotation
+  const [quotePrice,  setQuotePrice]  = useState('')
+  const [quoteNotes,  setQuoteNotes]  = useState('')
+  const [quoteBusy,   setQuoteBusy]   = useState(false)
+
   useEffect(() => {
     setBusy(true)
     setError('')
@@ -137,15 +143,25 @@ export default function AdminOrderDetailPage() {
   async function handleAssign(editorId?: string, qaId?: string) {
     setAssigning(true)
     try {
-      await adminAssignEditor(id, { 
-        editor_id: editorId ?? order?.editor_id ?? null,
-        qa_id: qaId ?? order?.qa_id ?? null
-      })
-      setOrder(o => o ? { 
-        ...o, 
-        editor_id: editorId ?? o.editor_id,
-        qa_id: qaId ?? o.qa_id 
-      } : o)
+      if (order?.track_type === 'literary') {
+        if (editorId) await adminAssignLiteraryRole(id, 'editor', editorId)
+        if (qaId) await adminAssignLiteraryRole(id, 'proofreader', qaId)
+        setOrder(o => o ? { 
+          ...o, 
+          editor_id: editorId ?? o.editor_id,
+          proofreader_id: qaId ?? o.proofreader_id,
+        } : o)
+      } else {
+        await adminAssignEditor(id, { 
+          editor_id: editorId ?? order?.editor_id ?? null,
+          qa_id: qaId ?? order?.qa_id ?? null
+        })
+        setOrder(o => o ? { 
+          ...o, 
+          editor_id: editorId ?? o.editor_id,
+          qa_id: qaId ?? o.qa_id 
+        } : o)
+      }
     } catch (e: any) {
       alert(e.message)
     } finally {
@@ -166,6 +182,27 @@ export default function AdminOrderDetailPage() {
     } finally { setPayBusy(false) }
   }
 
+  async function handleCancel() {
+    if (!confirm('確定要取消此訂單？')) return
+    try {
+      await adminCancelOrder(id)
+      setOrder(o => o ? { ...o, status: 'cancelled' } : o)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '取消訂單失敗')
+    }
+  }
+
+  async function handleCompleteLiteraryRole(role: 'editor' | 'proofreader') {
+    const label = role === 'editor' ? '編輯' : '校對'
+    if (!confirm(`確定標記${label}已${role === 'editor' ? '完成編輯' : '完成校對'}？`)) return
+    try {
+      await adminCompleteLiteraryRole(id, role)
+      setTick(t => t + 1)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '操作失敗')
+    }
+  }
+
   async function handleDeliver() {
     if (!gcsPath.trim()) { alert('請輸入 GCS 路徑'); return }
     if (!confirm('確定標記此訂單為已交付？')) return
@@ -176,6 +213,20 @@ export default function AdminOrderDetailPage() {
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : '交付失敗')
     } finally { setDeliverBusy(false) }
+  }
+
+  async function handleSetQuote() {
+    const price = Number(quotePrice)
+    if (!price || price <= 0) { alert('請輸入有效報價金額'); return }
+    if (!confirm(`確定報價 NT${price.toLocaleString()}？`)) return
+    setQuoteBusy(true)
+    try {
+      await adminUpdateQuote(id, { quoted_price: price, admin_notes: quoteNotes || undefined })
+      setOrder(o => o ? { ...o, status: 'quoted', quoted_price: price } : o)
+      setQuotePrice(''); setQuoteNotes('')
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '報價失敗')
+    } finally { setQuoteBusy(false) }
   }
 
   if (busy) return (
@@ -199,7 +250,16 @@ export default function AdminOrderDetailPage() {
     ['軌道',      <TrackBadge key="tr" track={order.track_type} />],
     ['語言',      <span key="l" className="text-base"><LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} /></span>],
     ['字數',      <span key="w" className="text-base">{order.word_count.toLocaleString()}</span>],
-    ['金額',      <span key="p" className="text-base font-semibold">NT${order.price_ntd.toLocaleString()}</span>],
+    ...(order.track_type === 'literary' && order.reference_price ? [
+      ['參考金額', <span key="rp" className="text-base text-mist">NT${order.reference_price.toLocaleString()}</span>]
+    ] as [string, React.ReactNode][] : []),
+    ...(order.track_type === 'literary' && order.quoted_price ? [
+      ['報價金額', <span key="qp" className="text-base font-semibold text-purple-400">NT${order.quoted_price.toLocaleString()}</span>]
+    ] as [string, React.ReactNode][] : []),
+    ...(order.track_type === 'literary' && order.quoted_at ? [
+      ['報價時間', <span key="qt" className="text-base text-mist">{dayjs(order.quoted_at).format('YYYY/MM/DD HH:mm')}</span>]
+    ] as [string, React.ReactNode][] : []),
+    ['金額',      <span key="p" className="text-base font-semibold">NT${(order.quoted_price || order.price_ntd).toLocaleString()}</span>],
     ['付款狀態',  <span key="ps" className="text-base">{order.payment_status === 'paid' ? '已付款' : '待付款'}</span>],
     ['建立時間',  <span key="c" className="text-base">{dayjs(order.created_at).format('YYYY/MM/DD HH:mm')}</span>],
     ...(order.deadline_at  ? [['截止時間', <span key="d"  className="text-base">{dayjs(order.deadline_at).format('YYYY/MM/DD HH:mm')}</span>]] as [string, React.ReactNode][] : []),
@@ -228,18 +288,22 @@ export default function AdminOrderDetailPage() {
         </select>
       </div>
     )],
-    ['指派 QA', (
+    [order.track_type === 'literary' ? '指派校對' : '指派 QA', (
       <div key="qa" className="flex items-center gap-2">
         <select
-          value={order.qa_id || ''}
+          value={order.track_type === 'literary' ? order.proofreader_id || '' : order.qa_id || ''}
           onChange={e => handleAssign(undefined, e.target.value || undefined)}
           disabled={assigning || isDelivered}
           className="rounded bg-[#1e293b] border border-white/10 text-paper text-xs px-2 py-1 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
         >
           <option value="" className="bg-[#1e293b] text-paper">未指派</option>
-          {qas.map(e => (
-            <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
-          ))}
+          {order.track_type === 'literary'
+            ? editors.map(e => (
+                <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
+              ))
+            : qas.map(e => (
+                <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
+              ))}
         </select>
         {assigning && <div className="w-3 h-3 border border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />}
       </div>
@@ -267,7 +331,8 @@ export default function AdminOrderDetailPage() {
         </div>
       </div>
 
-      {/* QA Review Action */}
+      {/* QA Review Action (Fast Track only — LT uses editor/proofreader workflow) */}
+      {order.track_type !== 'literary' && (
       <div className="flex gap-3">
         {['qa_review', 'editor_verify'].includes(order.status) && (
           <Link href={`/admin/orders/${order.id}/review`}
@@ -287,7 +352,39 @@ export default function AdminOrderDetailPage() {
             重新翻譯
           </button>
         )}
-      </div>
+       </div>
+      )}
+
+      {/* Literary Track Quotation */}
+      {order.track_type === 'literary' && order.status === 'awaiting_quote' && (
+        <div className="rounded-xl border border-purple-400/20 bg-white/5 p-4 space-y-3">
+          <h2 className="text-base font-semibold text-purple-400">LT 報價</h2>
+          {order.reference_price && (
+            <p className="text-sm text-mist">參考價格：NT${order.reference_price.toLocaleString()}（字數 × 費率）</p>
+          )}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-mist block mb-1">報價金額 (NT$)</label>
+              <input type="number" value={quotePrice} onChange={e => setQuotePrice(e.target.value)}
+                placeholder={order.reference_price ? String(order.reference_price) : '請輸入報價'}
+                className="w-full rounded-md bg-white/10 border border-white/10 text-paper text-sm px-3 py-2
+                           placeholder:text-mist focus:border-purple-400 focus:outline-none" />
+            </div>
+            <div>
+              <label className="text-sm text-mist block mb-1">備註（選填）</label>
+              <input type="text" value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)}
+                placeholder="報價說明"
+                className="w-full rounded-md bg-white/10 border border-white/10 text-paper text-sm px-3 py-2
+                           placeholder:text-mist focus:border-purple-400 focus:outline-none" />
+            </div>
+          </div>
+          <button onClick={handleSetQuote} disabled={quoteBusy}
+            className="px-4 py-2 rounded-md bg-purple-600 text-white text-sm font-medium
+                       hover:bg-purple-700 disabled:opacity-40 transition-colors">
+            {quoteBusy ? '處理中…' : '送出報價'}
+          </button>
+        </div>
+      )}
 
       {/* Translated result */}
       {downloadUrl && (
@@ -317,14 +414,16 @@ export default function AdminOrderDetailPage() {
       </div>
 
       {/* Confirm payment */}
-      {order.status === 'pending_payment' && (
+      {(order.status === 'pending_payment' || order.status === 'quoted') && (
         <div className="rounded-xl border border-amber-400/20 bg-white/5 p-4 space-y-3">
-          <h2 className="text-base font-semibold text-amber-400">確認付款</h2>
+          <h2 className="text-base font-semibold text-amber-400">
+            {order.status === 'quoted' ? '已報價，確認付款' : '確認付款'}
+          </h2>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm text-mist block mb-1">收款金額 (NT$)</label>
               <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)}
-                placeholder={String(order.price_ntd)}
+                placeholder={String(order.quoted_price || order.price_ntd)}
                 className="w-full rounded-md bg-white/10 border border-white/10 text-paper text-sm px-3 py-2
                            placeholder:text-mist focus:border-gold focus:outline-none" />
             </div>
@@ -336,11 +435,55 @@ export default function AdminOrderDetailPage() {
                            placeholder:text-mist focus:border-gold focus:outline-none" />
             </div>
           </div>
-          <button onClick={handleConfirmPayment} disabled={payBusy}
-            className="px-4 py-2 rounded-md bg-amber-500 text-white text-sm font-medium
-                       hover:bg-amber-600 disabled:opacity-40 transition-colors">
-            {payBusy ? '處理中…' : '確認付款並觸發翻譯'}
+          <div className="flex items-center gap-3">
+            <button onClick={handleConfirmPayment} disabled={payBusy}
+              className="px-4 py-2 rounded-md bg-amber-500 text-white text-sm font-medium
+                         hover:bg-amber-600 disabled:opacity-40 transition-colors">
+              {payBusy ? '處理中…' : '確認付款並觸發翻譯'}
+            </button>
+            <button onClick={handleCancel}
+              className="px-4 py-2 rounded-md border border-coral/30 text-coral text-sm font-medium
+                         hover:bg-coral/10 transition-colors">
+              取消訂單
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LT: awaiting_quote — cancel option */}
+      {order.status === 'awaiting_quote' && (
+        <div className="rounded-xl border border-purple-400/20 bg-white/5 p-4 space-y-3">
+          <h2 className="text-base font-semibold text-purple-400">等待報價</h2>
+          <p className="text-sm text-mist">此訂單尚未報價</p>
+          <button onClick={handleCancel}
+            className="px-4 py-2 rounded-md border border-coral/30 text-coral text-sm font-medium
+                       hover:bg-coral/10 transition-colors">
+            取消訂單
           </button>
+        </div>
+      )}
+
+      {/* LT: Editor / Proofreader completion */}
+      {order.track_type === 'literary' && (order.status === 'editing' || order.status === 'editor_done' || order.status === 'proofreading') && (
+        <div className="rounded-xl border border-purple-400/20 bg-white/5 p-4 space-y-3">
+          <h2 className="text-base font-semibold text-purple-400">LT 人工流程</h2>
+          <p className="text-sm text-mist">目前狀態：<span className="text-paper font-medium">{order.status}</span></p>
+          <div className="flex gap-3">
+            {order.status === 'editing' && (
+              <button onClick={() => handleCompleteLiteraryRole('editor')}
+                className="px-4 py-2 rounded-md bg-purple-600 text-white text-sm font-medium
+                           hover:bg-purple-700 transition-colors">
+                標記編輯完成 → 指派校對
+              </button>
+            )}
+            {(order.status === 'editor_done' || order.status === 'proofreading') && (
+              <button onClick={() => handleCompleteLiteraryRole('proofreader')}
+                className="px-4 py-2 rounded-md bg-purple-600 text-white text-sm font-medium
+                           hover:bg-purple-700 transition-colors">
+                標記校對完成
+              </button>
+            )}
+          </div>
         </div>
       )}
 

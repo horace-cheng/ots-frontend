@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { listAssignments, updateAssignment, Assignment } from '@/lib/api'
 import dayjs from 'dayjs'
 
@@ -75,7 +76,13 @@ export default function LiteraryPage() {
                     {STATUS_LABELS[a.status] ?? a.status}
                   </span>
                 </div>
-                <p className="text-xs text-mist">{dayjs(a.assigned_at).format('MM/DD HH:mm')}</p>
+                <div className="flex items-center gap-2">
+                  <Link href={`/admin/orders/${a.order_id}`}
+                    className="text-xs text-gold hover:underline">
+                    訂單詳情
+                  </Link>
+                  <p className="text-xs text-mist">{dayjs(a.assigned_at).format('MM/DD HH:mm')}</p>
+                </div>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">

@@ -1,0 +1,282 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import {
+  ltGetOrder, ltGetSegments, ltUpdateSegments, ltCompleteAssignment, ltRejectAssignment,
+  Order, QASegment
+} from '@/lib/api'
+import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
+
+export default function LtProofreadPage() {
+  const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+
+  const [order,    setOrder]    = useState<Order | null>(null)
+  const [segments, setSegments] = useState<QASegment[]>([])
+  const [saving,   setSaving]   = useState(false)
+  const [busy,     setBusy]     = useState(true)
+  const [error,    setError]    = useState('')
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectNotes, setRejectNotes] = useState('')
+  const [rejectError, setRejectError] = useState('')
+
+  useEffect(() => {
+    setBusy(true)
+    Promise.all([
+      ltGetOrder(id, 'proofreader'),
+      ltGetSegments(id, 'proofreader'),
+    ]).then(([o, s]) => {
+      setOrder(o)
+      setSegments(s.segments)
+    }).catch(e => {
+      if (e.message !== 'NEXT_REDIRECT') setError(e.message)
+    }).finally(() => setBusy(false))
+  }, [id])
+
+  const handleSegmentChange = (index: number, value: string) => {
+    setSegments(prev => prev.map(s => s.index === index ? { ...s, translated: value } : s))
+  }
+
+  const handleCommentChange = (index: number, value: string) => {
+    setSegments(prev => prev.map(s => s.index === index ? { ...s, proofreader_comments: value } : s))
+  }
+
+  const handleSaveDraft = async () => {
+    setSaving(true)
+    try {
+      await ltUpdateSegments(id, 'proofreader', segments.map(s => ({
+        index:           s.index,
+        translated:      s.translated,
+        proofreader_comments: s.proofreader_comments,
+      })))
+      alert('已儲存草稿')
+    } catch (e: any) {
+      alert(e.message || '儲存失敗')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleComplete = async () => {
+    if (!confirm('確定完成校對工作？')) return
+    setSaving(true)
+    try {
+      await ltUpdateSegments(id, 'proofreader', segments.map(s => ({
+        index:           s.index,
+        translated:      s.translated,
+        proofreader_comments: s.proofreader_comments,
+      })))
+      await ltCompleteAssignment(id, 'proofreader')
+      alert('校對工作已完成，訂單將進入交付階段')
+      router.push('/editor/orders')
+    } catch (e: any) {
+      alert(e.message || '提交失敗')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!rejectNotes.trim()) {
+      setRejectError('請填寫退回原因')
+      return
+    }
+    if (rejectNotes.length > 2000) {
+      setRejectError('退回原因不能超過 2000 字')
+      return
+    }
+    setSaving(true)
+    try {
+      await ltUpdateSegments(id, 'proofreader', segments.map(s => ({
+        index:           s.index,
+        translated:      s.translated,
+        proofreader_comments: s.proofreader_comments,
+      })))
+      await ltRejectAssignment(id, 'proofreader', rejectNotes)
+      alert('已退回修改，編輯將重新處理')
+      router.push('/editor/orders')
+    } catch (e: any) {
+      alert(e.message || '退回失敗')
+    } finally {
+      setSaving(false)
+      setShowRejectModal(false)
+    }
+  }
+
+  if (busy) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+    </div>
+  )
+
+  if (error || !order) return (
+    <div className="p-8 text-coral">{error || '訂單加載失敗'}</div>
+  )
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-120px)] -m-6 bg-night">
+      {/* Sticky Header */}
+      <div className="z-20 bg-night/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <Link href="/editor/orders" className="p-2 rounded-full hover:bg-white/5 text-mist transition-colors">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </Link>
+          <div>
+            <h1 className="text-lg font-bold text-paper flex items-center gap-2">
+              Literary Track — 校對
+              <span className="text-xs font-mono text-mist bg-white/5 px-2 py-0.5 rounded uppercase tracking-tighter">
+                {id.slice(-8)}
+              </span>
+            </h1>
+            <p className="text-xs text-mist flex items-center gap-2 mt-0.5">
+              <LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} />
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              共 {segments.length} 個段落
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              {order.word_count?.toLocaleString()} 字
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <StatusBadge status={order.status} />
+          <button onClick={handleSaveDraft} disabled={saving}
+            className="px-4 py-2 rounded-lg border border-white/10 text-sm font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
+            {saving ? '處理中...' : '儲存草稿'}
+          </button>
+          <button onClick={() => { setShowRejectModal(true); setRejectNotes(''); setRejectError('') }} disabled={saving}
+            className="px-6 py-2 rounded-lg border border-coral/50 text-sm font-bold text-coral hover:bg-coral/10 hover:scale-105 active:scale-95 transition-all">
+            退回修改
+          </button>
+          <button onClick={handleComplete} disabled={saving}
+            className="px-6 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-500/20">
+            完成校對
+          </button>
+        </div>
+      </div>
+
+      {/* Proofreader Content */}
+      <div className="flex-1 overflow-auto custom-scrollbar">
+        <div className="max-w-[1400px] mx-auto p-6 space-y-4">
+          {segments.map((seg) => {
+            const allFlags = seg.flags || []
+            const hasMustFix = allFlags.some(f => f.flag_level === 'must_fix' && !f.resolved)
+            const isUntranslated = allFlags.some(f => f.flag_type === 'untranslated' && !f.resolved)
+
+            return (
+            <div key={seg.index} className={`group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasMustFix ? 'ring-1 ring-coral/30 rounded-xl' : ''}`}>
+              {/* Left: Source + Editor's version */}
+              <div className={`relative rounded-xl border p-4 transition-colors ${isUntranslated ? 'border-coral/40 bg-coral/[0.04]' : 'border-white/5 bg-white/[0.02]'} group-hover:${isUntranslated ? 'border-coral/60' : 'border-white/10'}`}>
+                <div className="absolute top-3 left-3 text-[10px] font-mono select-none flex items-center gap-1.5">
+                  <span className={isUntranslated ? 'text-coral/70' : 'text-mist/30'}>#{seg.index + 1}</span>
+                  {isUntranslated && <span className="text-[9px] font-bold text-coral bg-coral/10 px-1.5 py-0.5 rounded uppercase tracking-tighter">未翻譯</span>}
+                </div>
+                <div className="mt-4 text-sm text-mist leading-relaxed whitespace-pre-wrap">
+                  {seg.source}
+                </div>
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <p className="text-[10px] uppercase font-bold text-gold/60 mb-1">編輯譯文</p>
+                  <div className="text-sm text-paper/80 leading-relaxed whitespace-pre-wrap">
+                    {seg.translated || '—'}
+                  </div>
+                </div>
+                {seg.raw && seg.raw !== seg.translated && (
+                  <details className="mt-3 group/raw">
+                    <summary className="text-[10px] text-mist/50 hover:text-emerald-400 cursor-pointer list-none flex items-center gap-1 transition-colors">
+                      <svg className="w-3 h-3 group-open/raw:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      NMT 原始譯文
+                    </summary>
+                    <div className="mt-2 text-sm text-mist/50 italic bg-white/[0.02] p-2 rounded border border-dashed border-white/5">
+                      {seg.raw}
+                    </div>
+                  </details>
+                )}
+
+                {/* Editor Comments (read-only) */}
+                {seg.editor_comments && (
+                  <div className="mt-3 p-3 rounded-lg bg-gold/5 border border-gold/10">
+                    <p className="text-[10px] uppercase font-bold text-gold/60 mb-1">編輯備註</p>
+                    <p className="text-xs text-paper/70 whitespace-pre-wrap">{seg.editor_comments}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Proofreader corrections */}
+              <div className="flex flex-col gap-2">
+                <div className={`relative rounded-xl border p-4 transition-all focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500/50 ${isUntranslated ? 'border-coral/30 bg-coral/[0.03]' : 'border-emerald-500/20 bg-emerald-500/[0.03]'}`}>
+                  <textarea
+                    value={seg.translated}
+                    onChange={(e) => handleSegmentChange(seg.index, e.target.value)}
+                    rows={Math.max(3, Math.ceil(seg.translated.length / 50))}
+                    placeholder="修正譯文..."
+                    className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30"
+                  />
+                </div>
+
+                {/* QA Flag indicators */}
+                {allFlags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {allFlags.map((flag) => (
+                      <span key={flag.id} className={`text-[12px] font-medium px-2 py-0.5 rounded-full ${flag.resolved ? 'bg-white/5 text-mist/40 border border-white/10 line-through' : flag.flag_level === 'must_fix' ? 'bg-coral/10 text-coral border border-coral/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                        {flag.flag_type === 'untranslated' ? '未翻譯' : flag.flag_type === 'missing_translation' ? '漏譯' : flag.flag_type}
+                        {flag.resolved && ' ✓'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Proofreader Comments */}
+                <textarea
+                  value={seg.proofreader_comments || ''}
+                  onChange={(e) => handleCommentChange(seg.index, e.target.value)}
+                  rows={2}
+                  placeholder="校對備註（選填）"
+                  className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:border-emerald-500/30 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+          )})}
+        </div>
+      </div>
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-night border border-white/10 rounded-2xl p-6 space-y-4">
+            <h3 className="text-lg font-bold text-paper">退回修改</h3>
+            <p className="text-sm text-mist">請填寫退回原因，編輯將根據您的意見重新修改譯文。</p>
+            <textarea
+              value={rejectNotes}
+              onChange={(e) => { setRejectNotes(e.target.value); setRejectError('') }}
+              rows={6}
+              maxLength={2000}
+              placeholder="請詳細說明需要修改的部分..."
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-paper focus:border-coral/50 focus:outline-none resize-none placeholder:text-mist/30"
+            />
+            <div className="flex items-center justify-between">
+              <span className={`text-xs ${rejectNotes.length > 1800 ? 'text-coral' : 'text-mist'}`}>
+                {rejectNotes.length} / 2000
+              </span>
+              {rejectError && <span className="text-xs text-coral">{rejectError}</span>}
+            </div>
+            <div className="flex items-center gap-3 justify-end">
+              <button onClick={() => setShowRejectModal(false)}
+                className="px-4 py-2 rounded-lg border border-white/10 text-sm text-mist hover:text-paper transition-all">
+                取消
+              </button>
+              <button onClick={handleReject} disabled={saving}
+                className="px-6 py-2 rounded-lg bg-coral text-sm font-bold text-white hover:bg-coral/90 transition-all">
+                {saving ? '處理中...' : '確認退回'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -30,9 +30,23 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
         router.push('/login')
       } else {
         getMe().then(me => {
-          if (!me.is_editor && !me.is_qa && !me.is_admin) {
-            alert('您沒有 Editor 或 QA 權限')
-            router.push('/')
+          // Allow access for editors, QAs, admins, or users with LT assignments
+          const hasFtRole = me.is_editor || me.is_qa || me.is_admin
+          if (!hasFtRole) {
+            // For users without FT roles, allow if they have LT assignments
+            import('@/lib/api').then(api =>
+              api.ltListAssignments({ limit: 1, offset: 0 })
+            ).then(d => {
+              if (d.total === 0) {
+                alert('您沒有 Editor、QA 權限或 Literary Track 指派')
+                router.push('/')
+              } else {
+                setIsEditor(me.is_editor || me.is_admin)
+                setChecking(false)
+              }
+            }).catch(() => {
+              router.push('/')
+            })
           } else {
             setIsEditor(me.is_editor || me.is_admin)
             setChecking(false)
