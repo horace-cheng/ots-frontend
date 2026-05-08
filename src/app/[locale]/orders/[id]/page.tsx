@@ -3,7 +3,7 @@ import { useEffect, useState, ReactNode } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { getOrder, getDownloadUrl, cancelOrder, Order } from '@/lib/api'
+import { getOrder, getDownloadUrl, cancelOrder, updateOrder, Order } from '@/lib/api'
 import { PortalHeader } from '@/components/portal/header'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import dayjs from 'dayjs'
@@ -70,12 +70,15 @@ export default function OrderDetailPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
 
-  const [order,       setOrder]       = useState<Order | null>(null)
-  const [downloadUrl, setDownloadUrl] = useState('')
-  const [busy,        setBusy]        = useState(true)
-  const [cancelling,  setCancelling]  = useState(false)
-  const [error,       setError]       = useState('')
-  const [tick,        setTick]        = useState(0)
+  const [order,        setOrder]        = useState<Order | null>(null)
+  const [downloadUrl,  setDownloadUrl]  = useState('')
+  const [busy,         setBusy]         = useState(true)
+  const [cancelling,   setCancelling]   = useState(false)
+  const [error,        setError]        = useState('')
+  const [tick,         setTick]         = useState(0)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [editTitle,    setEditTitle]    = useState('')
+  const [savingTitle,  setSavingTitle]  = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -102,6 +105,24 @@ export default function OrderDetailPage() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '取消失敗')
     } finally { setCancelling(false) }
+  }
+
+  async function handleSaveTitle() {
+    const trimmed = editTitle.trim()
+    if (trimmed === (order?.title || '').trim()) {
+      setEditingTitle(false)
+      return
+    }
+    setSavingTitle(true)
+    try {
+      const updated = await updateOrder(id, { title: trimmed || undefined })
+      setOrder(updated)
+      setEditingTitle(false)
+    } catch (e: any) {
+      alert(e.message || '更新標題失敗')
+    } finally {
+      setSavingTitle(false)
+    }
   }
 
   if (loading || busy) return (
@@ -131,7 +152,39 @@ export default function OrderDetailPage() {
             <Link href="/orders" className="text-xs text-mist hover:text-gold transition-colors">
               ← 我的訂單
             </Link>
-            <h1 className="font-display text-2xl font-bold text-ink mt-1">{order.title || '訂單詳情'}</h1>
+            {editingTitle ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  maxLength={50}
+                  autoFocus
+                  className="font-display text-2xl font-bold text-ink bg-white border border-ink/20 rounded-lg px-3 py-1 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 w-80"
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') setEditingTitle(false) }}
+                />
+                <button onClick={handleSaveTitle} disabled={savingTitle}
+                  className="px-3 py-1.5 rounded-lg bg-gold text-sm font-bold text-night hover:bg-gold-light transition-all disabled:opacity-40">
+                  {savingTitle ? '儲存中…' : '儲存'}
+                </button>
+                <button onClick={() => setEditingTitle(false)}
+                  className="px-3 py-1.5 rounded-lg border border-ink/20 text-sm text-mist hover:text-ink transition-all">
+                  取消
+                </button>
+              </div>
+            ) : (
+              <h1 className="font-display text-2xl font-bold text-ink mt-1 group flex items-center gap-2">
+                {order.title || '訂單詳情'}
+                {!['delivered', 'cancelled'].includes(order.status) && (
+                  <button onClick={() => { setEditTitle(order.title || ''); setEditingTitle(true) }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-ink/5 text-mist hover:text-ink transition-all">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                )}
+              </h1>
+            )}
             <p className="text-xs text-mist font-mono mt-0.5">{order.id}</p>
           </div>
           <div className="flex items-center gap-2">

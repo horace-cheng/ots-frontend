@@ -64,6 +64,9 @@ export const listOrders = (params?: { status?: string; track_type?: string; limi
 export const cancelOrder = (id: string) =>
   request<{ message: string }>('DELETE', `/orders/${id}`)
 
+export const updateOrder = (id: string, data: { title?: string }) =>
+  request<Order>('PATCH', `/orders/${id}`, data)
+
 export const adminCancelOrder = (id: string) =>
   request<{ message: string }>('DELETE', `/admin/orders/${id}`)
 
