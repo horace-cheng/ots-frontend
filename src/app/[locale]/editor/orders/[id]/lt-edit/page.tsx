@@ -4,9 +4,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ltGetOrder, ltGetSegments, ltUpdateSegments, ltCompleteAssignment,
-  Order, QASegment
+  ltGetOriginalContent, ltListSupportFiles, ltGetSupportFileContent,
+  Order, QASegment, SupportFile,
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
+import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function LtEditPage() {
   const { id } = useParams<{ id: string }>()
@@ -16,7 +18,10 @@ export default function LtEditPage() {
   const [segments, setSegments] = useState<QASegment[]>([])
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(true)
-  const [error, setError] = useState('')
+  const [showOriginal, setShowOriginal] = useState(false)
+  const [showSupportFiles, setShowSupportFiles] = useState(false)
+  const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
+  const [viewingSupportFile, setViewingSupportFile] = useState<{ orderId: string; fileId: string } | null>(null)
 
   useEffect(() => {
     setBusy(true)
@@ -27,7 +32,9 @@ export default function LtEditPage() {
       setOrder(o)
       setSegments(s.segments)
     }).catch(e => {
-      if (e.message !== 'NEXT_REDIRECT') setError(e.message)
+      if (e.message === 'NEXT_REDIRECT') return
+      alert(e.message || '訂單載入失敗')
+      router.push('/editor/orders')
     }).finally(() => setBusy(false))
   }, [id])
 
@@ -88,9 +95,7 @@ export default function LtEditPage() {
     </div>
   )
 
-  if (error || !order) return (
-    <div className="p-8 text-coral">{error || '訂單加載失敗'}</div>
-  )
+  if (!order) return null
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] -m-6 bg-night">
@@ -127,6 +132,20 @@ export default function LtEditPage() {
 
         <div className="flex items-center gap-3">
           <StatusBadge status={order.status} />
+          <button onClick={() => setShowOriginal(true)}
+            className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
+            原始內容
+          </button>
+          <button onClick={async () => {
+            try {
+              const res = await ltListSupportFiles(id)
+              setSupportFiles(res.files)
+              setShowSupportFiles(true)
+            } catch { alert('讀取參考文件失敗') }
+          }}
+            className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
+            參考文件
+          </button>
           <button onClick={handleSaveDraft} disabled={saving}
             className="px-4 py-2 rounded-lg border border-white/10 text-sm font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             {saving ? '處理中...' : '儲存草稿'}
@@ -224,6 +243,59 @@ export default function LtEditPage() {
           })}
         </div>
       </div>
+
+      <OriginalContentViewer
+        open={showOriginal}
+        onClose={() => setShowOriginal(false)}
+        fetchContent={() => ltGetOriginalContent(id)}
+      />
+
+      {/* Support Files Modal */}
+      {showSupportFiles && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSupportFiles(false)}>
+          <div className="w-full max-w-lg max-h-[60vh] bg-night border border-white/10 rounded-2xl p-6 space-y-3 overflow-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-paper">參考文件</h3>
+              <button onClick={() => setShowSupportFiles(false)}
+                className="p-1 rounded hover:bg-white/10 text-mist hover:text-paper transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {supportFiles.length === 0 ? (
+              <p className="text-sm text-mist">尚無參考文件</p>
+            ) : (
+              supportFiles.map(f => (
+                <button key={f.id} onClick={() => setViewingSupportFile({ orderId: id, fileId: f.id })}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-all text-left">
+                  <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-paper truncate">{f.filename}</p>
+                    <p className="text-[10px] text-mist">{f.file_role} · {(f.file_size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <svg className="w-4 h-4 text-mist shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      <OriginalContentViewer
+        open={viewingSupportFile !== null}
+        onClose={() => setViewingSupportFile(null)}
+        fetchContent={() => {
+          if (!viewingSupportFile) throw new Error('No file selected')
+          return ltGetSupportFileContent(viewingSupportFile.orderId, viewingSupportFile.fileId)
+        }}
+      />
     </div>
   )
 }

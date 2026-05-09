@@ -4,9 +4,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   editorGetOrder, editorGetSegments, editorUpdateSegments, editorSubmit, editorReturn,
+  editorGetOriginalContent,
   Order, QASegment, UserProfile, getMe
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
+import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function EditorVerifyPage() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +20,7 @@ export default function EditorVerifyPage() {
   const [busy,     setBusy]     = useState(true)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
+  const [showOriginal, setShowOriginal] = useState(false)
 
   useEffect(() => {
     setBusy(true)
@@ -129,6 +132,12 @@ export default function EditorVerifyPage() {
 
         <div className="flex items-center gap-3">
           <StatusBadge status={order.status} />
+          {order.gcs_upload_path && (
+            <button onClick={() => setShowOriginal(true)}
+              className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
+              原始內容
+            </button>
+          )}
           <button onClick={handleSaveDraft} disabled={saving}
             className="px-4 py-2 rounded-lg border border-white/10 text-sm font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             {saving ? '處理中...' : '儲存草稿'}
@@ -224,6 +233,12 @@ export default function EditorVerifyPage() {
           ))}
         </div>
       </div>
+
+      <OriginalContentViewer
+        open={showOriginal}
+        onClose={() => setShowOriginal(false)}
+        fetchContent={() => editorGetOriginalContent(id)}
+      />
     </div>
   )
 }

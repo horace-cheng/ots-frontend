@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 interface OriginalContentViewerProps {
   open: boolean
   onClose: () => void
-  fetchContent: () => Promise<{ filename: string; content_type: string; text: string }>
+  fetchContent: () => Promise<{ filename: string; content_type: string; html: string }>
 }
 
 export default function OriginalContentViewer({ open, onClose, fetchContent }: OriginalContentViewerProps) {
@@ -44,7 +44,7 @@ export default function OriginalContentViewer({ open, onClose, fetchContent }: O
     fetchContent()
       .then(r => {
         setFilename(r.filename)
-        setContent(r.text)
+        setContent(r.html)
       })
       .catch(e => setError(e.message || '讀取失敗'))
       .finally(() => setLoading(false))
@@ -95,7 +95,7 @@ export default function OriginalContentViewer({ open, onClose, fetchContent }: O
           )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           {content !== null && !loading && (
-            <pre className="text-[13px] text-zinc-900 whitespace-pre-wrap break-words leading-relaxed">{content}</pre>
+            <div className="text-[13px] text-zinc-900 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: content }} />
           )}
         </div>
       </div>

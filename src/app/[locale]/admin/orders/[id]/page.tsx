@@ -6,7 +6,8 @@ import {
   adminGetOrder, adminGetDownloadUrl, adminGetOriginalContent, confirmPayment, markDelivered, adminListQaFlags,
   adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminUpdateQuote,
   adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
-  Order, QAFlag, QAResult, UserAccount
+  adminListSupportFiles, adminGetSupportFileContent,
+  Order, QAFlag, QAResult, UserAccount, SupportFile
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import OriginalContentViewer from '@/components/original-content-viewer'
@@ -80,6 +81,9 @@ export default function AdminOrderDetailPage() {
   const [qas,         setQas]         = useState<UserAccount[]>([])
   const [assigning,   setAssigning]   = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
+  const [showSupportFiles, setShowSupportFiles] = useState(false)
+  const [viewingSupportFile, setViewingSupportFile] = useState<{ orderId: string; fileId: string } | null>(null)
 
   async function handleUpdateStatus(newStatus: string) {
     if (!confirm(`確定將訂單狀態改為 ${newStatus}？`)) return
@@ -131,6 +135,8 @@ export default function AdminOrderDetailPage() {
         adminGetDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
       }
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
+
+    adminListSupportFiles(id).then(r => setSupportFiles(r.files)).catch(() => {})
 
     // 獨立獲取符合該訂單語言要求的 Editor / QA 列表用於指派
     adminListEligibleUsers(id).then(d => {
@@ -271,6 +277,13 @@ export default function AdminOrderDetailPage() {
       <button key="orig" onClick={() => setShowOriginal(true)}
         className="text-xs text-gold hover:text-gold-light underline underline-offset-2">
         查看原始內容
+      </button>
+    )]] as [string, React.ReactNode][] : []),
+    ...(supportFiles.length > 0 ? [[
+      '參考文件', (
+      <button key="sf" onClick={() => setShowSupportFiles(true)}
+        className="text-xs text-gold hover:text-gold-light underline underline-offset-2">
+        {supportFiles.length} 個檔案
       </button>
     )]] as [string, React.ReactNode][] : []),
     ['指派 Editor', (
@@ -528,6 +541,53 @@ export default function AdminOrderDetailPage() {
           ))}
         </div>
       )}
+
+      {/* Support Files Modal */}
+      {showSupportFiles && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSupportFiles(false)}>
+          <div className="w-full max-w-lg max-h-[60vh] bg-night border border-white/10 rounded-2xl p-6 space-y-3 overflow-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-paper">參考文件</h3>
+              <button onClick={() => setShowSupportFiles(false)}
+                className="p-1 rounded hover:bg-white/10 text-mist hover:text-paper transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {supportFiles.length === 0 ? (
+              <p className="text-sm text-mist">尚無參考文件</p>
+            ) : (
+              supportFiles.map(f => (
+                <button key={f.id} onClick={() => setViewingSupportFile({ orderId: id, fileId: f.id })}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-all text-left">
+                  <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-paper truncate">{f.filename}</p>
+                    <p className="text-[10px] text-mist">{f.file_role} · {(f.file_size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <svg className="w-4 h-4 text-mist shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      <OriginalContentViewer
+        open={viewingSupportFile !== null}
+        onClose={() => setViewingSupportFile(null)}
+        fetchContent={() => {
+          if (!viewingSupportFile) throw new Error('No file selected')
+          return adminGetSupportFileContent(viewingSupportFile.orderId, viewingSupportFile.fileId)
+        }}
+      />
 
       <OriginalContentViewer
         open={showOriginal}

@@ -121,7 +121,25 @@ export const adminGetDownloadUrl = (id: string) =>
   request<{ signed_url: string }>('GET', `/admin/orders/${id}/download-url`)
 
 export const adminGetOriginalContent = (id: string) =>
-  request<{ filename: string; content_type: string; text: string }>('GET', `/admin/orders/${id}/original-content`)
+  request<{ filename: string; content_type: string; html: string }>('GET', `/admin/orders/${id}/original-content`)
+
+export const adminListSupportFiles = (id: string) =>
+  request<{ files: SupportFile[]; total: number }>('GET', `/admin/orders/${id}/support-files`)
+
+export const adminGetSupportFileContent = (orderId: string, fileId: string) =>
+  request<{ filename: string; content_type: string; html: string }>('GET', `/admin/orders/${orderId}/support-files/${fileId}/content`)
+
+export const editorGetOriginalContent = (id: string) =>
+  request<{ filename: string; content_type: string; html: string }>('GET', `/editor/orders/${id}/original-content`)
+
+export const ltGetOriginalContent = (id: string) =>
+  request<{ filename: string; content_type: string; html: string }>('GET', `/editor/lt/orders/${id}/original-content`)
+
+export const ltListSupportFiles = (id: string) =>
+  request<{ files: SupportFile[]; total: number }>('GET', `/editor/lt/orders/${id}/support-files`)
+
+export const ltGetSupportFileContent = (orderId: string, fileId: string) =>
+  request<{ filename: string; content_type: string; html: string }>('GET', `/editor/lt/orders/${orderId}/support-files/${fileId}/content`)
 
 export const adminListOrders = (params?: { status?: string; track_type?: string; limit?: number; offset?: number }) => {
   const qs = new URLSearchParams(
