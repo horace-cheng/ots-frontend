@@ -2,6 +2,15 @@ import { getIdToken } from './firebase'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || ''
 
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+    this.name = 'ApiError'
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -37,7 +46,7 @@ async function request<T>(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || `HTTP ${res.status}`)
+    throw new ApiError(err.detail || `HTTP ${res.status}`, res.status)
   }
 
   return res.json()

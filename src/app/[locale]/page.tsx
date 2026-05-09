@@ -4,7 +4,7 @@ import { useRouter, Link } from '@/i18n/routing'
 import { PortalHeader } from '@/components/portal/header'
 import { useAuth } from '@/lib/auth-context'
 import { createOrder, getUploadUrl, uploadFile, confirmUpload, getMe,
-  getSupportUploadUrl, confirmSupportUpload } from '@/lib/api'
+  getSupportUploadUrl, confirmSupportUpload, ApiError } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { extractTextAndCountWords } from '@/lib/file-extractor'
 
@@ -31,12 +31,20 @@ export default function HomePage() {
   const router = useRouter()
   const t = useTranslations('Home')
   const [userRoles, setUserRoles] = useState<{ is_admin: boolean; is_editor: boolean; is_qa: boolean } | null>(null)
+  const [pendingActivation, setPendingActivation] = useState(false)
 
   useEffect(() => {
     if (user) {
-      getMe().then(me => setUserRoles({ is_admin: me.is_admin, is_editor: me.is_editor, is_qa: me.is_qa })).catch(() => {})
+      getMe()
+        .then(me => setUserRoles({ is_admin: me.is_admin, is_editor: me.is_editor, is_qa: me.is_qa }))
+        .catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 403) {
+            setPendingActivation(true)
+          }
+        })
     } else {
       setUserRoles(null)
+      setPendingActivation(false)
     }
   }, [user])
   const [form, setForm]     = useState({ track_type: 'fast', source_lang: 'tai-lo', target_lang: 'en', title: '', notes: '' })
@@ -129,7 +137,12 @@ export default function HomePage() {
 
       setStep('confirm')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '發生錯誤，請稍後再試')
+      if (err instanceof ApiError && err.status === 403) {
+        setError('您的帳號尚未啟用，請等待管理員審核後再建立訂單。')
+        setPendingActivation(true)
+      } else {
+        setError(err instanceof Error ? err.message : '發生錯誤，請稍後再試')
+      }
       setStep('form')
     } finally { setBusy(false) }
   }
@@ -229,8 +242,21 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Form / Confirm */}
-          {step === 'confirm' ? (
+          {/* Pending activation */}
+          {user && pendingActivation ? (
+            <div className="card" style={{ textAlign: 'center', borderTop: '3px solid var(--gold)' }}>
+              <div style={{ width: 48, height: 48, background: '#fef3c7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+              </div>
+              <h2 className="font-display" style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>帳號尚未啟用</h2>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.7, marginBottom: '1rem' }}>
+                您的帳號正在等待管理員啟用。<br />
+                啟用後即可開始建立翻譯訂單。<br />
+                若有疑問請聯繫管理員。
+              </p>
+              <Link href="/orders" className="btn btn-outline" style={{ fontSize: '0.8rem' }}>查看我的訂單</Link>
+            </div>
+          ) : step === 'confirm' ? (
             <div className="card fade-up" style={{ textAlign: 'center' }}>
               <div style={{ width: 48, height: 48, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
                 <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
