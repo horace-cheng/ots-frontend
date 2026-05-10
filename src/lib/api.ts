@@ -199,12 +199,12 @@ export const updateSamplePackage = (orderId: string, data: SamplePackageUpdate) 
   request<MessageResponse>('PATCH', `/editor/lt/orders/${orderId}/sample-package`, data)
 
 export const generateSamplePackage = (orderId: string) =>
-  request<{ message: string; translator_bio: string; book_fact_sheet: BookFactSheet; synopsis: string }>(
+  request<{ message: string; translator_bio: string; book_fact_sheet: BookFactSheet; synopsis: string; market_analysis: string }>(
     'POST', `/orders/${orderId}/sample-package/generate`
   )
 
 export const editorGenerateSamplePackage = (orderId: string) =>
-  request<{ message: string; translator_bio: string; book_fact_sheet: BookFactSheet; synopsis: string }>(
+  request<{ message: string; translator_bio: string; book_fact_sheet: BookFactSheet; synopsis: string; market_analysis: string }>(
     'POST', `/editor/lt/orders/${orderId}/sample-package/generate`
   )
 
@@ -453,13 +453,19 @@ export interface SamplePackage {
 }
 
 export interface BookFactSheet {
-  title?:      string
-  author?:     string
-  publisher?:  string
-  pub_date?:   string
-  word_count?: string
-  category?:   string
-  sales?:      string
+  title_original?:      string
+  title_target?:        string
+  author_original?:     string
+  author_target?:       string
+  publisher_original?:  string
+  publisher_target?:    string
+  pub_date_original?:   string
+  pub_date_target?:     string
+  word_count?:          string
+  category_original?:   string
+  category_target?:     string
+  sales_original?:      string
+  sales_target?:        string
 }
 
 export interface SamplePackageUpdate {

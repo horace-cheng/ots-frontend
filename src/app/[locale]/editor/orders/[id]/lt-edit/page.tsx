@@ -347,23 +347,46 @@ export default function LtEditPage() {
                 {/* 2. Book Fact Sheet */}
                 <div>
                   <label className="text-xs font-bold text-mist uppercase tracking-wider">書目資料表</label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {[
-                      ['title', '書名'], ['author', '作者'], ['publisher', '出版社'],
-                      ['pub_date', '出版日期'], ['word_count', '字數'], ['category', '類別'], ['sales', '銷售資訊'],
-                    ].map(([key, label]) => (
-                      <div key={key}>
-                        <label className="text-[10px] text-mist/60">{label}</label>
-                        <input type="text"
-                          value={(pkgDraft.book_fact_sheet as any)?.[key] || ''}
+                  {([
+                    ['title_original', 'title_target', '書名'],
+                    ['author_original', 'author_target', '作者'],
+                    ['publisher_original', 'publisher_target', '出版社'],
+                    ['pub_date_original', 'pub_date_target', '出版日期'],
+                    ['category_original', 'category_target', '類別'],
+                    ['sales_original', 'sales_target', '銷售資訊'],
+                  ] as const).map(([origKey, tgtKey, label]) => (
+                    <div key={origKey} className="mt-2">
+                      <label className="text-[10px] text-mist/60">{label}</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <input type="text" placeholder="原文"
+                          value={(pkgDraft.book_fact_sheet as any)?.[origKey] || ''}
                           onChange={e => setPkgDraft(prev => ({
                             ...prev,
-                            book_fact_sheet: { ...(prev.book_fact_sheet || {}), [key]: e.target.value }
+                            book_fact_sheet: { ...(prev.book_fact_sheet || {}), [origKey]: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-paper focus:outline-none focus:border-purple-500/50"
+                        />
+                        <input type="text" placeholder="譯文"
+                          value={(pkgDraft.book_fact_sheet as any)?.[tgtKey] || ''}
+                          onChange={e => setPkgDraft(prev => ({
+                            ...prev,
+                            book_fact_sheet: { ...(prev.book_fact_sheet || {}), [tgtKey]: e.target.value }
                           }))}
                           className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-paper focus:outline-none focus:border-purple-500/50"
                         />
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                  <div className="mt-2">
+                    <label className="text-[10px] text-mist/60">字數</label>
+                    <input type="text"
+                      value={(pkgDraft.book_fact_sheet as any)?.word_count || ''}
+                      onChange={e => setPkgDraft(prev => ({
+                        ...prev,
+                        book_fact_sheet: { ...(prev.book_fact_sheet || {}), word_count: e.target.value }
+                      }))}
+                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-paper focus:outline-none focus:border-purple-500/50"
+                    />
                   </div>
                 </div>
 
@@ -423,7 +446,7 @@ export default function LtEditPage() {
                         translator_bio: result.translator_bio,
                         book_fact_sheet: result.book_fact_sheet,
                         synopsis: result.synopsis,
-                        market_analysis: pkgDraft.market_analysis || '',
+                        market_analysis: result.market_analysis || '',
                         notes: pkgDraft.notes || '',
                       })
                       setSamplePkg(prev => prev ? { ...prev, ...result, status: 'generated' } : null)
