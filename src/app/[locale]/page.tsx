@@ -4,7 +4,7 @@ import { useRouter, Link } from '@/i18n/routing'
 import { PortalHeader } from '@/components/portal/header'
 import { useAuth } from '@/lib/auth-context'
 import { createOrder, getUploadUrl, uploadFile, confirmUpload, getMe,
-  getSupportUploadUrl, confirmSupportUpload, ApiError } from '@/lib/api'
+  getSupportUploadUrl, confirmSupportUpload, generateSamplePackage, ApiError } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { extractTextAndCountWords } from '@/lib/file-extractor'
 
@@ -57,6 +57,7 @@ export default function HomePage() {
   const [orderId, setOrderId] = useState('')
   const [price, setPrice]   = useState(0)
   const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
+  const [samplePackage, setSamplePackage] = useState(false)
 
   const isLT = form.track_type === 'literary'
   const prevTrack = form.track_type
@@ -66,6 +67,7 @@ export default function HomePage() {
       setWordCount(0)
       setFile(null)
       setSupportFiles([])
+      setSamplePackage(false)
     }
     setForm(f => ({ ...f, [k]: v }))
   }
@@ -107,9 +109,10 @@ export default function HomePage() {
     e.preventDefault()
     if (!user) { router.push('/login'); return }
     if (!file) { setError('請選擇要上傳的文件'); return }
+    if (samplePackage && supportFiles.length === 0) { setError('請上傳至少一份參考文件以產生試譯包'); return }
     setError(''); setBusy(true)
     try {
-      const order = await createOrder({ ...form, title: form.title.trim() || undefined, word_count: wordCount || 1 })
+      const order = await createOrder({ ...form, title: form.title.trim() || undefined, word_count: wordCount || 1, sample_package: samplePackage })
       setOrderId(order.order_id); setPrice(order.price_ntd); setStep('upload')
 
       // Upload main file
@@ -132,6 +135,15 @@ export default function HomePage() {
             gcs_path: sfPath,
             file_role: sf.role,
           })
+        }
+      }
+
+      // Auto-generate sample package if opted in
+      if (samplePackage) {
+        try {
+          await generateSamplePackage(order.order_id)
+        } catch {
+          // Non-fatal: generation will be available in editor
         }
       }
 
@@ -365,8 +377,14 @@ export default function HomePage() {
               {/* LT Support Files */}
               {isLT && (
                 <div style={{ marginBottom: '0.75rem' }}>
-                  <label className="field-label">參考文件（選填）</label>
-                  <p style={{ fontSize: '0.7rem', color: '#64748b', marginBottom: '0.4rem' }}>可上傳詞彙表、風格指南、背景資料等，幫助提升翻譯品質</p>
+                  <label className="field-label">
+                    參考文件{samplePackage ? '（必填）' : '（選填）'}
+                  </label>
+                  <p style={{ fontSize: '0.7rem', color: '#64748b', marginBottom: '0.4rem' }}>
+                    {samplePackage
+                      ? '試譯包需要至少一份參考文件。上傳詞彙表、風格指南、背景資料等。'
+                      : '可上傳詞彙表、風格指南、背景資料等，幫助提升翻譯品質'}
+                  </p>
                   <input type="file" multiple accept=".txt,.docx,.pdf,.xlsx,.csv" onChange={handleSupportFileChange}
                     style={{ display: 'block', width: '100%', fontSize: '0.8rem', color: '#64748b', cursor: 'pointer', padding: '0.375rem 0' }} />
                   {supportFiles.length > 0 && (
@@ -391,6 +409,25 @@ export default function HomePage() {
                         </div>
                       ))}
                     </div>
+                  )}
+
+                  {/* Sample Package checkbox */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={samplePackage}
+                      onChange={e => setSamplePackage(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: '#7c3aed' }}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 600 }}>
+                      需要試譯提案包（Sample Translation Package）
+                    </span>
+                  </label>
+                  {samplePackage && (
+                    <p style={{ fontSize: '0.7rem', color: '#7c3aed', marginTop: '0.3rem', lineHeight: 1.5 }}>
+                      系統將從參考文件提取內容，自動產生書目資料表與故事大綱（Gemini 生成），
+                      編輯與校對人員可在審閱頁面編輯所有內容。交付後可下載完整試譯包。
+                    </p>
                   )}
                 </div>
               )}

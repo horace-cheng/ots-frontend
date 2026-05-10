@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { 
   editorListOrders, createInvitation, editorAssignQa, adminListEligibleUsers, 
-  ltListAssignments,
+  ltListAssignments, updateMyProfile,
   Order, UserAccount, Assignment, getMe
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
@@ -23,6 +23,9 @@ export default function EditorOrdersPage() {
   const [inviteResult, setInviteResult] = useState('')
   const [isEditor, setIsEditor] = useState(false)
   const [isQa, setIsQa] = useState(false)
+  const [showBioModal, setShowBioModal] = useState(false)
+  const [bioText, setBioText] = useState('')
+  const [bioSaving, setBioSaving] = useState(false)
 
   // LT assignments
   const [ltAssignments, setLtAssignments] = useState<Assignment[]>([])
@@ -124,6 +127,19 @@ export default function EditorOrdersPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold text-paper">待審閱訂單</h1>
         <div className="flex items-center gap-3">
+          <button onClick={async () => {
+            try {
+              const me = await getMe()
+              setBioText(me.bio || '')
+              setShowBioModal(true)
+            } catch {}
+          }}
+            className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 transition-colors"
+            title="個人簡介">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </button>
           <span className="text-xs text-mist">共 {activeTab === 'ft' ? total : ltTotal} 筆</span>
           <button onClick={() => setTick(t => t + 1)} disabled={busy || ltBusy}
             className="p-1.5 rounded-lg border border-white/10 text-mist hover:text-paper hover:border-white/30 disabled:opacity-40 transition-colors">
@@ -321,6 +337,51 @@ export default function EditorOrdersPage() {
           onPageSizeChange={setPageSize}
           theme="dark"
         />
+      )}
+
+      {/* Bio Settings Modal */}
+      {showBioModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBioModal(false)}>
+          <div className="w-full max-w-lg bg-night border border-white/10 rounded-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-paper">譯者簡介</h3>
+              <button onClick={() => setShowBioModal(false)}
+                className="p-1 rounded hover:bg-white/10 text-mist hover:text-paper transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-mist">
+              此簡介將用於試譯提案包的「譯者簡介」欄位。請使用翻譯目標語言填寫。
+            </p>
+            <textarea
+              value={bioText}
+              onChange={e => setBioText(e.target.value)}
+              rows={6}
+              placeholder="請簡介您的翻譯經歷、出版作品、專業領域..."
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-paper leading-relaxed resize-none focus:outline-none focus:border-gold/50 placeholder:text-mist/30"
+            />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowBioModal(false)}
+                className="px-4 py-2 rounded-lg border border-white/10 text-sm text-mist hover:text-paper transition-all">
+                取消
+              </button>
+              <button onClick={async () => {
+                setBioSaving(true)
+                try {
+                  await updateMyProfile({ bio: bioText })
+                  alert('簡介已儲存')
+                  setShowBioModal(false)
+                } catch (e: any) { alert(e.message || '儲存失敗') }
+                finally { setBioSaving(false) }
+              }} disabled={bioSaving}
+                className="px-5 py-2 rounded-lg bg-gold text-sm font-bold text-night hover:bg-gold-light transition-all">
+                {bioSaving ? '儲存中...' : '儲存'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

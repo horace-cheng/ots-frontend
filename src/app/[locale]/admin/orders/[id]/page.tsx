@@ -254,6 +254,9 @@ export default function AdminOrderDetailPage() {
     ['訂單 ID',   <span key="id" className="text-xs font-mono text-mist">{order.id}</span>],
     ['標題',      <span key="ti" className="text-base">{order.title || '—'}</span>],
     ['軌道',      <TrackBadge key="tr" track={order.track_type} />],
+    ...(order.has_sample_package ? [
+      ['試譯包',   <span key="sp" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs font-medium">☑ 需要試譯提案包</span>]
+    ] as [string, React.ReactNode][] : []),
     ['語言',      <span key="l" className="text-base"><LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} /></span>],
     ['字數',      <span key="w" className="text-base">{order.word_count.toLocaleString()}</span>],
     ...(order.track_type === 'literary' && order.reference_price ? [
@@ -372,6 +375,11 @@ export default function AdminOrderDetailPage() {
       {order.track_type === 'literary' && order.status === 'awaiting_quote' && (
         <div className="rounded-xl border border-purple-400/20 bg-white/5 p-4 space-y-3">
           <h2 className="text-base font-semibold text-purple-400">LT 報價</h2>
+          {order.has_sample_package && (
+            <p className="text-sm font-medium text-purple-400">
+              ☑ 此訂單需要試譯提案包 — 請評估額外工時成本
+            </p>
+          )}
           {order.reference_price && (
             <p className="text-sm text-mist">參考價格：NT${order.reference_price.toLocaleString()}（字數 × 費率）</p>
           )}

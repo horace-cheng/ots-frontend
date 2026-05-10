@@ -55,8 +55,8 @@ async function request<T>(
 // ── Orders ────────────────────────────────────────────────────────────────────
 export const createOrder = (data: {
   track_type: string; source_lang: string; target_lang: string
-  word_count: number; title?: string; notes?: string
-}) => request<{ order_id: string; payment_url: string; status: string; price_ntd: number; created_at: string }>(
+  word_count: number; title?: string; notes?: string; sample_package?: boolean
+}) => request<{ order_id: string; payment_url: string; status: string; price_ntd: number; has_sample_package: boolean; created_at: string }>(
   'POST', '/orders', data
 )
 
@@ -185,6 +185,32 @@ export const adminListUsers = (params?: { limit?: number; offset?: number }) => 
 export const adminUpdateUser = (id: string, data: { disabled?: boolean; is_admin?: boolean; is_editor?: boolean }) =>
   request<{ message: string }>('PATCH', `/admin/users/${id}`, data)
 
+// ── User Profile ─────────────────────────────────────────────────────────────
+export const updateMyProfile = (data: {
+  bio?: string; client_type?: string; company_name?: string; tax_id?: string; invoice_carrier?: string
+}) =>
+  request<UserProfile>('PATCH', '/users/me', data)
+
+// ── Sample Translation Package ──────────────────────────────────────────────
+export const getSamplePackage = (orderId: string) =>
+  request<SamplePackage>('GET', `/editor/lt/orders/${orderId}/sample-package`)
+
+export const updateSamplePackage = (orderId: string, data: SamplePackageUpdate) =>
+  request<MessageResponse>('PATCH', `/editor/lt/orders/${orderId}/sample-package`, data)
+
+export const generateSamplePackage = (orderId: string) =>
+  request<{ message: string; translator_bio: string; book_fact_sheet: BookFactSheet; synopsis: string }>(
+    'POST', `/orders/${orderId}/sample-package/generate`
+  )
+
+export const editorGenerateSamplePackage = (orderId: string) =>
+  request<{ message: string; translator_bio: string; book_fact_sheet: BookFactSheet; synopsis: string }>(
+    'POST', `/editor/lt/orders/${orderId}/sample-package/generate`
+  )
+
+export const downloadSamplePackage = (orderId: string) =>
+  request<{ download_url: string; message: string }>('GET', `/orders/${orderId}/sample-package/download`)
+
 export const adminGetSegments = (id: string) =>
   request<{ segments: QASegment[] }>('GET', `/admin/orders/${id}/segments`)
 
@@ -303,6 +329,7 @@ export interface Order {
   quoted_at?: string
   title?: string
   notes?: string
+  has_sample_package?: boolean
   created_at: string
   deadline_at?: string
   delivered_at?: string
@@ -328,6 +355,7 @@ export interface UserProfile {
   is_editor:       boolean
   is_qa:           boolean
   roles:           string[]
+  bio:             string
   created_at:      string
 }
 
@@ -409,4 +437,35 @@ export interface QASegmentUpdate {
   comments?:  string
   editor_comments?: string
   proofreader_comments?: string
+}
+
+export interface SamplePackage {
+  id:              string
+  order_id:        string
+  status:          string
+  translator_bio:  string
+  book_fact_sheet: BookFactSheet
+  synopsis:        string
+  market_analysis: string
+  notes?:          string
+  updated_at?:     string
+  updated_by?:     string
+}
+
+export interface BookFactSheet {
+  title?:      string
+  author?:     string
+  publisher?:  string
+  pub_date?:   string
+  word_count?: string
+  category?:   string
+  sales?:      string
+}
+
+export interface SamplePackageUpdate {
+  translator_bio?:  string
+  book_fact_sheet?: BookFactSheet
+  synopsis?:        string
+  market_analysis?: string
+  notes?:           string
 }

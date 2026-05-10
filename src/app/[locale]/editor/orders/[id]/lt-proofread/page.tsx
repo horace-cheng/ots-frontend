@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   ltGetOrder, ltGetSegments, ltUpdateSegments, ltCompleteAssignment, ltRejectAssignment,
   ltGetOriginalContent, ltListSupportFiles, ltGetSupportFileContent,
-  Order, QASegment, SupportFile,
+  getSamplePackage, updateSamplePackage,
+  Order, QASegment, SupportFile, SamplePackage,
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import OriginalContentViewer from '@/components/original-content-viewer'
@@ -25,6 +26,11 @@ export default function LtProofreadPage() {
   const [showSupportFiles, setShowSupportFiles] = useState(false)
   const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
   const [viewingSupportFile, setViewingSupportFile] = useState<{ orderId: string; fileId: string } | null>(null)
+  const [showPackage, setShowPackage] = useState(false)
+  const [samplePkg, setSamplePkg] = useState<SamplePackage | null>(null)
+  const [pkgLoading, setPkgLoading] = useState(false)
+  const [pkgSaving, setPkgSaving] = useState(false)
+  const [pkgDraft, setPkgDraft] = useState<Partial<SamplePackage>>({})
 
   useEffect(() => {
     setBusy(true)
@@ -162,6 +168,20 @@ export default function LtProofreadPage() {
             className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             參考文件
           </button>
+          {order.has_sample_package && (
+            <button onClick={async () => {
+              setPkgLoading(true); setShowPackage(true)
+              try {
+                const pkg = await getSamplePackage(id)
+                setSamplePkg(pkg)
+                setPkgDraft({ ...pkg })
+              } catch { alert('讀取試譯提案包失敗') }
+              finally { setPkgLoading(false) }
+            }}
+              className="px-3 py-1.5 rounded-lg border border-purple-500/30 text-xs font-medium text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-all">
+              試譯提案包
+            </button>
+          )}
           <button onClick={handleSaveDraft} disabled={saving}
             className="px-4 py-2 rounded-lg border border-white/10 text-sm font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             {saving ? '處理中...' : '儲存草稿'}
@@ -346,6 +366,125 @@ export default function LtProofreadPage() {
                 {saving ? '處理中...' : '確認退回'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sample Package Modal */}
+      {showPackage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPackage(false)}>
+          <div className="w-full max-w-2xl max-h-[80vh] bg-night border border-white/10 rounded-2xl p-6 space-y-4 overflow-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-bold text-paper">試譯提案包</h3>
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                  samplePkg?.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                  samplePkg?.status === 'generated' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                  'bg-mist/10 text-mist border border-white/10'
+                }`}>
+                  {samplePkg?.status === 'completed' ? '已完成' : samplePkg?.status === 'generated' ? '已產生' : '草稿'}
+                </span>
+              </div>
+              <button onClick={() => setShowPackage(false)}
+                className="p-1 rounded hover:bg-white/10 text-mist hover:text-paper transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {pkgLoading ? (
+              <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" /></div>
+            ) : (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-mist uppercase tracking-wider">書目資料表</label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {[
+                      ['title', '書名'], ['author', '作者'], ['publisher', '出版社'],
+                      ['pub_date', '出版日期'], ['word_count', '字數'], ['category', '類別'], ['sales', '銷售資訊'],
+                    ].map(([key, label]) => (
+                      <div key={key}>
+                        <label className="text-[10px] text-mist/60">{label}</label>
+                        <input type="text"
+                          value={(pkgDraft.book_fact_sheet as any)?.[key] || ''}
+                          onChange={e => setPkgDraft(prev => ({
+                            ...prev,
+                            book_fact_sheet: { ...(prev.book_fact_sheet || {}), [key]: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-paper focus:outline-none focus:border-purple-500/50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-mist uppercase tracking-wider">故事大綱</label>
+                  <textarea
+                    value={pkgDraft.synopsis || ''}
+                    onChange={e => setPkgDraft(prev => ({ ...prev, synopsis: e.target.value }))}
+                    rows={8}
+                    className="w-full mt-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-paper leading-relaxed resize-none focus:outline-none focus:border-purple-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-mist uppercase tracking-wider">譯者簡介</label>
+                  <textarea
+                    value={pkgDraft.translator_bio || ''}
+                    onChange={e => setPkgDraft(prev => ({ ...prev, translator_bio: e.target.value }))}
+                    rows={4}
+                    className="w-full mt-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-paper leading-relaxed resize-none focus:outline-none focus:border-purple-500/50"
+                    placeholder="可從個人設定同步譯者簡介..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-mist uppercase tracking-wider">市場分析</label>
+                  <textarea
+                    value={pkgDraft.market_analysis || ''}
+                    onChange={e => setPkgDraft(prev => ({ ...prev, market_analysis: e.target.value }))}
+                    rows={4}
+                    className="w-full mt-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-paper leading-relaxed resize-none focus:outline-none focus:border-purple-500/50"
+                    placeholder="同類作品比較、目標市場分析、推薦原因..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-mist uppercase tracking-wider">備註</label>
+                  <textarea
+                    value={pkgDraft.notes || ''}
+                    onChange={e => setPkgDraft(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={2}
+                    className="w-full mt-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-mist leading-relaxed resize-none focus:outline-none focus:border-purple-500/50"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button onClick={async () => {
+                    setPkgSaving(true)
+                    try {
+                      await updateSamplePackage(id, {
+                        translator_bio: pkgDraft.translator_bio,
+                        book_fact_sheet: pkgDraft.book_fact_sheet,
+                        synopsis: pkgDraft.synopsis,
+                        market_analysis: pkgDraft.market_analysis,
+                        notes: pkgDraft.notes,
+                      })
+                      const updated = await getSamplePackage(id)
+                      setSamplePkg(updated)
+                      setPkgDraft({ ...updated })
+                      alert('試譯提案包已儲存')
+                    } catch (e: any) { alert(e.message || '儲存失敗') }
+                    finally { setPkgSaving(false) }
+                  }} disabled={pkgSaving}
+                    className="px-5 py-2 rounded-lg bg-purple-600 text-sm font-bold text-white hover:bg-purple-500 transition-all">
+                    {pkgSaving ? '儲存中...' : '儲存'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
