@@ -259,7 +259,7 @@ export default function OrderDetailPage() {
             ['翻譯軌道', <TrackBadge key="t" track={order.track_type} />],
             ['語言方向', <span key="l" className="text-sm"><LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} /></span>],
             ['字數',     <span key="w" className="text-sm">{order.word_count.toLocaleString()} 字</span>],
-            ...(order.track_type === 'literary' && order.reference_price ? [
+            ...(order.track_type !== 'literary' && order.reference_price ? [
               ['參考金額', <span key="rp" className="text-sm text-mist">NT${order.reference_price.toLocaleString()}</span>]
             ] as [string, ReactNode][] : []),
             ['金額',     <span key="p" className="text-sm font-semibold">NT${(order.quoted_price || order.price_ntd).toLocaleString()}</span>],
