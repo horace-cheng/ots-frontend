@@ -79,6 +79,7 @@ export default function AdminOrderDetailPage() {
   const [downloadUrl, setDownloadUrl] = useState('')
   const [editors,     setEditors]     = useState<UserAccount[]>([])
   const [qas,         setQas]         = useState<UserAccount[]>([])
+  const [eligibleUsers, setEligibleUsers] = useState<UserAccount[]>([])
   const [assigning,   setAssigning]   = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
@@ -142,6 +143,7 @@ export default function AdminOrderDetailPage() {
     adminListEligibleUsers(id).then(d => {
       setEditors(d.users.filter(u => u.is_editor))
       setQas(d.users.filter(u => u.is_qa))
+      setEligibleUsers(d.users)
     }).catch(() => {})
   }, [id, tick])
 
@@ -306,6 +308,9 @@ export default function AdminOrderDetailPage() {
     )],
     [order.track_type === 'literary' ? '指派校對' : '指派 QA', (
       <div key="qa" className="flex items-center gap-2">
+        {order.track_type === 'literary' && order.assignment_status && !['editor_done', 'proofreading'].includes(order.assignment_status) ? (
+          <span className="text-xs text-mist italic">請先指派編輯並等待編輯完成</span>
+        ) : (
         <select
           value={order.track_type === 'literary' ? order.proofreader_id || '' : order.qa_id || ''}
           onChange={e => handleAssign(undefined, e.target.value || undefined)}
@@ -314,13 +319,14 @@ export default function AdminOrderDetailPage() {
         >
           <option value="" className="bg-[#1e293b] text-paper">未指派</option>
           {order.track_type === 'literary'
-            ? editors.map(e => (
-                <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
+            ? eligibleUsers.map(u => (
+                <option key={u.id} value={u.id} className="bg-[#1e293b] text-paper">{u.email || u.id.slice(-8)}</option>
               ))
             : qas.map(e => (
                 <option key={e.id} value={e.id} className="bg-[#1e293b] text-paper">{e.email || e.id.slice(-8)}</option>
               ))}
         </select>
+        )}
         {assigning && <div className="w-3 h-3 border border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />}
       </div>
     )],

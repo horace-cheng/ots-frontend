@@ -47,6 +47,11 @@ const NAV = [
     label: '帳號管理',
     icon: <Icon path="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
   },
+  {
+    href: '/admin/languages',
+    label: '語言設定',
+    icon: <Icon path="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 15h4.498m-4.498 0L15 11l2.249 4m-4.498 0L11 21" />,
+  },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -106,8 +111,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all',
                 pathname === n.href
-                  ? 'bg-gold/20 text-gold font-medium'
-                  : 'text-paper/60 hover:bg-white/5 hover:text-paper'
+                    ? 'bg-gold/20 text-gold font-medium'
+                    : 'text-paper/60 hover:bg-white/5 hover:text-paper'
               )}>
               {n.icon}
               {n.label}

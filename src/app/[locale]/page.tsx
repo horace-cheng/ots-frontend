@@ -4,22 +4,9 @@ import { useRouter, Link } from '@/i18n/routing'
 import { PortalHeader } from '@/components/portal/header'
 import { useAuth } from '@/lib/auth-context'
 import { createOrder, getUploadUrl, uploadFile, confirmUpload, getMe,
-  getSupportUploadUrl, confirmSupportUpload, generateSamplePackage, ApiError } from '@/lib/api'
+  getSupportUploadUrl, confirmSupportUpload, generateSamplePackage, ApiError, getLanguages, LanguageConfig } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { extractTextAndCountWords } from '@/lib/file-extractor'
-
-const LANG_OPTIONS = [
-  { value: 'tai-lo',     label: '台語（台羅拼音）' },
-  { value: 'hakka',      label: '客語' },
-  { value: 'indigenous', label: '原住民族語' },
-  { value: 'zh-tw',      label: '繁體中文' },
-]
-const TARGET_LANG_OPTIONS = [
-  { value: 'en',    label: 'English' },
-  { value: 'ja',    label: '日本語' },
-  { value: 'ko',    label: '한국어' },
-  { value: 'zh-tw', label: '繁體中文' },
-]
 
 interface SupportFile {
   file: File
@@ -72,9 +59,31 @@ export default function HomePage() {
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  const [activeLangs, setActiveLangs] = useState<LanguageConfig[]>([])
+
+  useEffect(() => {
+    getLanguages().then(res => {
+      setActiveLangs(res.languages)
+      if (res.languages.length > 0) {
+        const sources = res.languages.filter(l => l.direction === 'source' || l.direction === 'both')
+        const targets = res.languages.filter(l => l.direction === 'target' || l.direction === 'both')
+        setForm(f => ({
+          ...f,
+          source_lang: sources.some(s => s.code === f.source_lang) ? f.source_lang : (sources[0]?.code || 'tai-lo'),
+          target_lang: targets.some(t => t.code === f.target_lang) ? f.target_lang : (targets[0]?.code || 'en'),
+        }))
+      }
+    }).catch(console.error)
+  }, [])
+
+  const sourceOptions = activeLangs.filter(l => l.direction === 'source' || l.direction === 'both')
+  const targetOptions = activeLangs.filter(l => l.direction === 'target' || l.direction === 'both')
+
+  const targetMultiplier = activeLangs.find(l => l.code === form.target_lang)?.price_multiplier || 1.0
+
   const estimatedPrice = !isLT && wordCount > 0
     ? Math.max(
-        Math.round(wordCount * 2 * (form.target_lang === 'ja' ? 1.2 : 1)),
+        Math.round(wordCount * 2 * targetMultiplier),
         2000
       )
     : 0
@@ -331,13 +340,13 @@ export default function HomePage() {
                 <div>
                   <label className="field-label">原文語言</label>
                   <select className="field" value={form.source_lang} onChange={e => set('source_lang', e.target.value)}>
-                    {LANG_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {sourceOptions.length > 0 ? sourceOptions.map(o => <option key={o.code} value={o.code}>{o.label_zh}</option>) : <option>載入中...</option>}
                   </select>
                 </div>
                 <div>
                   <label className="field-label">目標語言</label>
                   <select className="field" value={form.target_lang} onChange={e => set('target_lang', e.target.value)}>
-                    {TARGET_LANG_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {targetOptions.length > 0 ? targetOptions.map(o => <option key={o.code} value={o.code}>{o.label_zh}</option>) : <option>載入中...</option>}
                   </select>
                 </div>
               </div>

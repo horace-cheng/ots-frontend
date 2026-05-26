@@ -124,6 +124,7 @@ body {
 }
 .field-dark::placeholder { color: rgba(255,255,255,0.35); }
 .field-dark:focus { border-color: var(--gold); }
+.field-dark option { background: var(--ink); color: var(--paper); }
 
 label.field-label {
   display: block;

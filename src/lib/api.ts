@@ -301,6 +301,27 @@ export const adminUpdateQuote = (order_id: string, data: { quoted_price: number;
   request<{ message: string }>('POST', `/admin/orders/${order_id}/quote`, data)
 
 
+// ── Language Configs ─────────────────────────────────────────────────────────
+export const getLanguages = () =>
+  request<{ languages: LanguageConfig[] }>('GET', '/languages', undefined, true)
+
+export const adminListSupportedLanguages = () =>
+  request<SupportedLanguage[]>('GET', '/languages/supported')
+
+export const adminListLanguages = () =>
+  request<{ languages: LanguageConfig[] }>('GET', '/admin/languages')
+
+export const adminCreateLanguage = (data: { code: string; direction: string; sort_order?: number; price_multiplier?: number }) =>
+  request<LanguageConfig>('POST', '/admin/languages', data)
+
+export const adminUpdateLanguage = (id: number, data: Partial<LanguageConfig>) =>
+  request<LanguageConfig>('PATCH', `/admin/languages/${id}`, data)
+
+export const adminDeleteLanguage = (id: number) =>
+  request<{ message: string }>('DELETE', `/admin/languages/${id}`)
+
+
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const getMe = () =>
   request<UserProfile>('GET', '/users/me')
@@ -475,3 +496,23 @@ export interface SamplePackageUpdate {
   market_analysis?: string
   notes?:           string
 }
+
+export interface LanguageConfig {
+  id:               number
+  code:             string
+  label_zh:         string
+  label_en:         string
+  direction:        string
+  is_active:        boolean
+  sort_order:       number
+  price_multiplier: number
+  created_at:       string
+}
+
+export interface SupportedLanguage {
+  code:             string
+  label_zh:         string
+  label_en:         string
+  default_direction: string
+}
+
