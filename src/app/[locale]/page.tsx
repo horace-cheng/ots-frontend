@@ -14,6 +14,9 @@ interface SupportFile {
 }
 
 export default function HomePage() {
+  const MAX_FILE_SIZE = 2 * 1024 * 1024
+  const MAX_ORDER_SIZE = 18 * 1024 * 1024
+
   const { user, loading } = useAuth()
   const router = useRouter()
   const t = useTranslations('Home')
@@ -92,16 +95,29 @@ export default function HomePage() {
     const f = e.target.files?.[0] || null
     setFile(f)
     if (!f) { setWordCount(0); return }
+    if (f.size > MAX_FILE_SIZE) {
+      setError(`檔案超過 ${MAX_FILE_SIZE / (1024 * 1024)} MB 上限（${(f.size / (1024 * 1024)).toFixed(1)} MB）`)
+      setFile(null)
+      setWordCount(0)
+      e.target.value = ''
+      return
+    }
+    setError('')
     setWordCount(await extractTextAndCountWords(f))
   }
 
   async function handleSupportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
     if (!files) return
-    const newFiles: SupportFile[] = Array.from(files).map(f => ({
-      file: f,
-      role: 'reference',
-    }))
+    const newFiles: SupportFile[] = []
+    for (const f of Array.from(files)) {
+        if (f.size > MAX_FILE_SIZE) {
+            setError(`檔案 ${f.name} 超過 ${MAX_FILE_SIZE / (1024 * 1024)} MB 上限（${(f.size / (1024 * 1024)).toFixed(1)} MB）`)
+            continue
+        }
+        newFiles.push({ file: f, role: 'reference' })
+    }
+    if (newFiles.length > 0) setError('')
     setSupportFiles(prev => [...prev, ...newFiles])
     e.target.value = ''
   }
@@ -119,13 +135,22 @@ export default function HomePage() {
     if (!user) { router.push('/login'); return }
     if (!file) { setError('請選擇要上傳的文件'); return }
     if (samplePackage && supportFiles.length === 0) { setError('請上傳至少一份參考文件以產生試譯包'); return }
+
+    const totalSize = file.size + supportFiles.reduce((s, sf) => s + sf.file.size, 0)
+    if (totalSize > MAX_ORDER_SIZE) {
+      setError(`所有檔案總和超過 ${MAX_ORDER_SIZE / (1024 * 1024)} MB 上限（${(totalSize / (1024 * 1024)).toFixed(1)} MB）`)
+      return
+    }
+
     setError(''); setBusy(true)
     try {
       const order = await createOrder({ ...form, title: form.title.trim() || undefined, word_count: wordCount || 1, sample_package: samplePackage })
       setOrderId(order.order_id); setPrice(order.price_ntd); setStep('upload')
 
       // Upload main file
-      const { signed_url, gcs_path } = await getUploadUrl({ order_id: order.order_id, filename: file.name, content_type: file.type || 'text/plain' })
+      const { signed_url, gcs_path } = await getUploadUrl({
+        order_id: order.order_id, filename: file.name, content_type: file.type || 'text/plain', file_size: file.size,
+      })
       await uploadFile(signed_url, file, setProgress)
       await confirmUpload(order.order_id, gcs_path)
 
@@ -353,7 +378,7 @@ export default function HomePage() {
 
               <div style={{ marginBottom: '0.75rem' }}>
                 <label className="field-label">上傳原文檔案</label>
-                <input type="file" accept=".txt,.docx,.pdf" onChange={handleFileChange}
+                <input type="file"             accept=".txt,.docx,.pdf,.html,.md" onChange={handleFileChange}
                   style={{ display: 'block', width: '100%', fontSize: '0.8rem', color: '#64748b', cursor: 'pointer', padding: '0.375rem 0' }} />
                 {file && (
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', alignItems: 'center' }}>
@@ -394,7 +419,7 @@ export default function HomePage() {
                       ? '試譯包需要至少一份參考文件。上傳詞彙表、風格指南、背景資料等。'
                       : '可上傳詞彙表、風格指南、背景資料等，幫助提升翻譯品質'}
                   </p>
-                  <input type="file" multiple accept=".txt,.docx,.pdf,.xlsx,.csv" onChange={handleSupportFileChange}
+                   <input type="file" multiple accept=".txt,.docx,.pdf,.xlsx,.csv,.html,.md" onChange={handleSupportFileChange}
                     style={{ display: 'block', width: '100%', fontSize: '0.8rem', color: '#64748b', cursor: 'pointer', padding: '0.375rem 0' }} />
                   {supportFiles.length > 0 && (
                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

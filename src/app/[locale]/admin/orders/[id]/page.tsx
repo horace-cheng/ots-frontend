@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  adminGetOrder, adminGetDownloadUrl, adminGetOriginalContent, confirmPayment, markDelivered, adminListQaFlags,
+  adminGetOrder, adminGetDownloadUrl, adminGetBilingualDownloadUrl, adminGetPlainTextDownloadUrl, adminGetOriginalContent, confirmPayment, markDelivered, adminListQaFlags,
   adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminUpdateQuote,
   adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
   adminListSupportFiles, adminGetSupportFileContent,
@@ -77,6 +77,8 @@ export default function AdminOrderDetailPage() {
   const [error,       setError]       = useState('')
   const [tick,        setTick]        = useState(0)
   const [downloadUrl, setDownloadUrl] = useState('')
+  const [bilingualDownloadUrl, setBilingualDownloadUrl] = useState('')
+  const [plainTextDownloadUrl, setPlainTextDownloadUrl] = useState('')
   const [editors,     setEditors]     = useState<UserAccount[]>([])
   const [qas,         setQas]         = useState<UserAccount[]>([])
   const [eligibleUsers, setEligibleUsers] = useState<UserAccount[]>([])
@@ -134,6 +136,12 @@ export default function AdminOrderDetailPage() {
       setQaFlags(flags.flags)
       if (o.gcs_output_path) {
         adminGetDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
+      }
+      if (o.gcs_bilingual_output_path) {
+        adminGetBilingualDownloadUrl(id).then(r => setBilingualDownloadUrl(r.signed_url)).catch(() => {})
+      }
+      if (o.gcs_plain_text_output_path) {
+        adminGetPlainTextDownloadUrl(id).then(r => setPlainTextDownloadUrl(r.signed_url)).catch(() => {})
       }
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
 
@@ -414,16 +422,32 @@ export default function AdminOrderDetailPage() {
       )}
 
       {/* Translated result */}
-      {downloadUrl && (
+      {(downloadUrl || bilingualDownloadUrl || plainTextDownloadUrl) && (
         <div className="rounded-xl border border-green-400/20 bg-green-400/5 p-4 flex items-center justify-between">
           <div>
             <p className="text-base font-semibold text-green-400">譯文檔案</p>
             <p className="text-sm text-mist mt-0.5">連結有效 1 小時</p>
           </div>
-          <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
-            className="px-4 py-2 rounded-md bg-green-700 text-white text-sm font-medium hover:bg-green-800 transition-colors">
-            開啟譯文
-          </a>
+          <div className="flex gap-2">
+            {downloadUrl && (
+              <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
+                className="px-4 py-2 rounded-md bg-green-700 text-white text-sm font-medium hover:bg-green-800 transition-colors">
+                開啟譯文
+              </a>
+            )}
+            {bilingualDownloadUrl && (
+              <a href={bilingualDownloadUrl} target="_blank" rel="noopener noreferrer"
+                className="px-4 py-2 rounded-md bg-blue-700 text-white text-sm font-medium hover:bg-blue-800 transition-colors">
+                開啟對照版
+              </a>
+            )}
+            {plainTextDownloadUrl && (
+              <a href={plainTextDownloadUrl} target="_blank" rel="noopener noreferrer"
+                className="px-4 py-2 rounded-md bg-gray-600 text-white text-sm font-medium hover:bg-gray-700 transition-colors">
+                下載純文字
+              </a>
+            )}
+          </div>
         </div>
       )}
 

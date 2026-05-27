@@ -80,7 +80,7 @@ export const adminCancelOrder = (id: string) =>
   request<{ message: string }>('DELETE', `/admin/orders/${id}`)
 
 // ── Files ─────────────────────────────────────────────────────────────────────
-export const getUploadUrl = (data: { order_id: string; filename: string; content_type: string }) =>
+export const getUploadUrl = (data: { order_id: string; filename: string; content_type: string; file_size: number }) =>
   request<{ signed_url: string; gcs_path: string }>('POST', '/files/upload-url', data)
 
 export const confirmUpload = (order_id: string, gcs_path: string) =>
@@ -88,6 +88,12 @@ export const confirmUpload = (order_id: string, gcs_path: string) =>
 
 export const getDownloadUrl = (order_id: string) =>
   request<{ signed_url: string }>('GET', `/files/${order_id}/download-url`)
+
+export const getBilingualDownloadUrl = (order_id: string) =>
+  request<{ signed_url: string }>('GET', `/files/${order_id}/bilingual-download-url`)
+
+export const getPlainTextDownloadUrl = (order_id: string) =>
+  request<{ signed_url: string }>('GET', `/files/${order_id}/plain-text-download-url`)
 
 // ── Support Files (Literary Track) ────────────────────────────────────────────
 export const getSupportUploadUrl = (order_id: string, filename: string, content_type: string = 'text/plain') =>
@@ -128,6 +134,12 @@ export const adminGetOrder = (id: string) =>
 
 export const adminGetDownloadUrl = (id: string) =>
   request<{ signed_url: string }>('GET', `/admin/orders/${id}/download-url`)
+
+export const adminGetBilingualDownloadUrl = (id: string) =>
+  request<{ signed_url: string }>('GET', `/admin/orders/${id}/bilingual-download-url`)
+
+export const adminGetPlainTextDownloadUrl = (id: string) =>
+  request<{ signed_url: string }>('GET', `/admin/orders/${id}/plain-text-download-url`)
 
 export const adminGetOriginalContent = (id: string) =>
   request<{ filename: string; content_type: string; html: string }>('GET', `/admin/orders/${id}/original-content`)
@@ -357,6 +369,8 @@ export interface Order {
   payment_status?: string
   invoice_no?: string
   gcs_output_path?: string
+  gcs_bilingual_output_path?: string
+  gcs_plain_text_output_path?: string
   gcs_upload_path?: string
   editor_id?: string
   qa_id?: string

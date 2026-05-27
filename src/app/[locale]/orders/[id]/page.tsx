@@ -3,7 +3,7 @@ import { useEffect, useState, ReactNode } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { getOrder, getDownloadUrl, cancelOrder, updateOrder, Order } from '@/lib/api'
+import { getOrder, getDownloadUrl, getBilingualDownloadUrl, getPlainTextDownloadUrl, cancelOrder, updateOrder, Order } from '@/lib/api'
 import { PortalHeader } from '@/components/portal/header'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import dayjs from 'dayjs'
@@ -72,6 +72,8 @@ export default function OrderDetailPage() {
 
   const [order,        setOrder]        = useState<Order | null>(null)
   const [downloadUrl,  setDownloadUrl]  = useState('')
+  const [bilingualDownloadUrl, setBilingualDownloadUrl] = useState('')
+  const [plainTextDownloadUrl, setPlainTextDownloadUrl] = useState('')
   const [busy,         setBusy]         = useState(true)
   const [cancelling,   setCancelling]   = useState(false)
   const [error,        setError]        = useState('')
@@ -92,6 +94,8 @@ export default function OrderDetailPage() {
       setOrder(o)
       if (o.status === 'delivered') {
         getDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
+        getBilingualDownloadUrl(id).then(r => setBilingualDownloadUrl(r.signed_url)).catch(() => {})
+        getPlainTextDownloadUrl(id).then(r => setPlainTextDownloadUrl(r.signed_url)).catch(() => {})
       }
     }).catch(() => setError('找不到此訂單')).finally(() => setBusy(false))
   }, [user, id, tick])
@@ -206,15 +210,31 @@ export default function OrderDetailPage() {
         )}
 
         {/* Delivered CTA */}
-        {order.status === 'delivered' && downloadUrl && (
-          <div className="card bg-green-50 border-green-200 mb-4 flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-green-800 text-sm">翻譯已完成！</p>
-              <p className="text-xs text-green-600">下載連結有效 1 小時</p>
+        {order.status === 'delivered' && (downloadUrl || bilingualDownloadUrl || plainTextDownloadUrl) && (
+          <div className="card bg-green-50 border-green-200 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="font-semibold text-green-800 text-sm">翻譯已完成！</p>
+                <p className="text-xs text-green-600">下載連結有效 1 小時</p>
+              </div>
             </div>
-            <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="btn-primary bg-green-700 text-sm py-2">
-              下載譯文
-            </a>
+            <div className="flex gap-2">
+              {downloadUrl && (
+                <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="btn-primary bg-green-700 text-sm py-2">
+                  下載譯文
+                </a>
+              )}
+              {bilingualDownloadUrl && (
+                <a href={bilingualDownloadUrl} target="_blank" rel="noopener noreferrer" className="btn-primary bg-blue-700 text-sm py-2">
+                  下載對照版
+                </a>
+              )}
+              {plainTextDownloadUrl && (
+                <a href={plainTextDownloadUrl} target="_blank" rel="noopener noreferrer" className="btn-primary bg-gray-700 text-sm py-2">
+                  下載純文字
+                </a>
+              )}
+            </div>
           </div>
         )}
 
