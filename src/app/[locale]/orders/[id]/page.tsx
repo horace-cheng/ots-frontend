@@ -81,10 +81,32 @@ export default function OrderDetailPage() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [editTitle,    setEditTitle]    = useState('')
   const [savingTitle,  setSavingTitle]  = useState(false)
+  const URL_LIFETIME = 900
+  const [fetchedAt,   setFetchedAt]    = useState(0)
+  const [remaining,   setRemaining]    = useState(URL_LIFETIME)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
   }, [user, loading, router])
+
+  // countdown timer for signed URLs — refresh only the download links on expiry
+  useEffect(() => {
+    if (fetchedAt === 0) return
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - fetchedAt) / 1000)
+      const left = Math.max(0, URL_LIFETIME - elapsed)
+      setRemaining(left)
+      if (left === 0) {
+        const now = Date.now()
+        setFetchedAt(now)
+        setRemaining(URL_LIFETIME)
+        getDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
+        getBilingualDownloadUrl(id).then(r => setBilingualDownloadUrl(r.signed_url)).catch(() => {})
+        getPlainTextDownloadUrl(id).then(r => setPlainTextDownloadUrl(r.signed_url)).catch(() => {})
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [fetchedAt, id])
 
   useEffect(() => {
     if (!user || !id) return
@@ -93,6 +115,9 @@ export default function OrderDetailPage() {
     getOrder(id).then(o => {
       setOrder(o)
       if (o.status === 'delivered') {
+        const now = Date.now()
+        setFetchedAt(now)
+        setRemaining(URL_LIFETIME)
         getDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
         getBilingualDownloadUrl(id).then(r => setBilingualDownloadUrl(r.signed_url)).catch(() => {})
         getPlainTextDownloadUrl(id).then(r => setPlainTextDownloadUrl(r.signed_url)).catch(() => {})
@@ -215,7 +240,11 @@ export default function OrderDetailPage() {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="font-semibold text-green-800 text-sm">翻譯已完成！</p>
-                <p className="text-xs text-green-600">下載連結有效 1 小時</p>
+                <p className="text-xs text-green-600">
+                  {remaining > 0
+                    ? `下載連結有效 ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
+                    : '連結已過期，重新整理中…'}
+                </p>
               </div>
             </div>
             <div className="flex gap-2">

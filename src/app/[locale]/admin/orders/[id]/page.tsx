@@ -3,11 +3,14 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  adminGetOrder, adminGetDownloadUrl, adminGetBilingualDownloadUrl, adminGetPlainTextDownloadUrl, adminGetOriginalContent, confirmPayment, markDelivered, adminListQaFlags,
+  adminGetOrder, adminGetDownloadUrl, adminGetBilingualDownloadUrl, adminGetPlainTextDownloadUrl,
+  adminGetOriginalContent, adminGetTokenUsage, adminGetTokenUsageDetail,
+  confirmPayment, markDelivered, adminListQaFlags,
   adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminUpdateQuote,
   adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
   adminListSupportFiles, adminGetSupportFileContent,
-  Order, QAFlag, QAResult, UserAccount, SupportFile
+  Order, QAFlag, QAResult, UserAccount, SupportFile,
+  TokenUsageItem, TokenUsageResponse, TokenUsageDetailItem
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import OriginalContentViewer from '@/components/original-content-viewer'
@@ -123,6 +126,13 @@ export default function AdminOrderDetailPage() {
   const [quoteNotes,  setQuoteNotes]  = useState('')
   const [quoteBusy,   setQuoteBusy]   = useState(false)
 
+  // token usage
+  const [tokenUsage,       setTokenUsage]       = useState<TokenUsageResponse | null>(null)
+  const [tokenBusy,        setTokenBusy]        = useState(false)
+  const [tokenDetail,      setTokenDetail]      = useState<TokenUsageDetailItem[] | null>(null)
+  const [tokenDetailOpen,  setTokenDetailOpen]  = useState(false)
+  const [tokenDetailBusy,  setTokenDetailBusy]  = useState(false)
+
   useEffect(() => {
     setBusy(true)
     setError('')
@@ -145,6 +155,7 @@ export default function AdminOrderDetailPage() {
       }
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
 
+    adminGetTokenUsage(id).then(r => setTokenUsage(r)).catch(e => console.warn('token-usage fetch failed:', e))
     adminListSupportFiles(id).then(r => setSupportFiles(r.files)).catch(() => {})
 
     // 獨立獲取符合該訂單語言要求的 Editor / QA 列表用於指派
@@ -426,7 +437,7 @@ export default function AdminOrderDetailPage() {
         <div className="rounded-xl border border-green-400/20 bg-green-400/5 p-4 flex items-center justify-between">
           <div>
             <p className="text-base font-semibold text-green-400">譯文檔案</p>
-            <p className="text-sm text-mist mt-0.5">連結有效 1 小時</p>
+            <p className="text-sm text-mist mt-0.5">連結有效 15 分鐘</p>
           </div>
           <div className="flex gap-2">
             {downloadUrl && (
@@ -448,6 +459,92 @@ export default function AdminOrderDetailPage() {
               </a>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Token Usage */}
+      {tokenUsage && (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gold">Token 用量</h2>
+            <button
+              onClick={() => {
+                if (tokenDetailOpen) { setTokenDetailOpen(false); return }
+                setTokenDetailBusy(true)
+                adminGetTokenUsageDetail(id)
+                  .then(r => { setTokenDetail(r.items); setTokenDetailOpen(true) })
+                  .catch(() => {})
+                  .finally(() => setTokenDetailBusy(false))
+              }}
+              className="text-xs px-2.5 py-1 rounded-md border border-white/10 text-mist hover:text-paper hover:border-white/30 transition"
+            >
+              {tokenDetailBusy ? '載入中…' : tokenDetailOpen ? '收起明細' : '查看明細'}
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-mist">Prompt</span>
+              <p className="text-paper font-mono">{tokenUsage.total_prompt.toLocaleString()}</p>
+            </div>
+            <div>
+              <span className="text-mist">Candidates</span>
+              <p className="text-paper font-mono">{tokenUsage.total_candidates.toLocaleString()}</p>
+            </div>
+            <div>
+              <span className="text-mist">Total</span>
+              <p className="text-paper font-mono">{tokenUsage.total_tokens.toLocaleString()}</p>
+            </div>
+          </div>
+          <p className="text-sm text-mist">成本: ${tokenUsage.total_cost_usd.toFixed(4)} USD</p>
+          <div className="space-y-2">
+            {tokenUsage.breakdown.map((item, i) => (
+              <div key={i} className="rounded-lg border border-white/5 bg-white/[0.02] p-3 space-y-1 text-xs text-mist">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-paper font-medium">{item.job_type}</span>
+                  <span className="font-mono">{item.model}</span>
+                </div>
+                <div className="font-mono">
+                  {item.prompt_tokens.toLocaleString()} × ${item.input_rate.toFixed(2)}/1M
+                  {' + '}
+                  {item.candidates_tokens.toLocaleString()} × ${item.output_rate.toFixed(2)}/1M
+                  {' = '}
+                  <span className="text-gold">${item.cost_usd.toFixed(6)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Detail table */}
+          {tokenDetailOpen && tokenDetail && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono text-mist">
+                <thead>
+                  <tr className="border-b border-white/10 text-left">
+                    <th className="py-1.5 pr-3">時間</th>
+                    <th className="py-1.5 pr-3">Job</th>
+                    <th className="py-1.5 pr-3">模型</th>
+                    <th className="py-1.5 pr-3 text-right">Prompt</th>
+                    <th className="py-1.5 pr-3 text-right">Candidates</th>
+                    <th className="py-1.5 pr-3 text-right">Total</th>
+                    <th className="py-1.5 pr-3 text-right">成本</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tokenDetail.map((d, i) => (
+                    <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-1.5 pr-3 whitespace-nowrap">{dayjs(d.created_at).format('HH:mm:ss')}</td>
+                      <td className="py-1.5 pr-3">{d.job_type}</td>
+                      <td className="py-1.5 pr-3">{d.model}</td>
+                      <td className="py-1.5 pr-3 text-right">{d.prompt_tokens.toLocaleString()}</td>
+                      <td className="py-1.5 pr-3 text-right">{d.candidates_tokens.toLocaleString()}</td>
+                      <td className="py-1.5 pr-3 text-right">{d.total_tokens.toLocaleString()}</td>
+                      <td className="py-1.5 pr-3 text-right text-gold">${d.cost_usd.toFixed(6)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

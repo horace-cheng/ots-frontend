@@ -141,6 +141,12 @@ export const adminGetBilingualDownloadUrl = (id: string) =>
 export const adminGetPlainTextDownloadUrl = (id: string) =>
   request<{ signed_url: string }>('GET', `/admin/orders/${id}/plain-text-download-url`)
 
+export const adminGetTokenUsage = (orderId: string) =>
+  request<TokenUsageResponse>('GET', `/admin/orders/${orderId}/token-usage`)
+
+export const adminGetTokenUsageDetail = (orderId: string) =>
+  request<TokenUsageDetailResponse>('GET', `/admin/orders/${orderId}/token-usage-detail`)
+
 export const adminGetOriginalContent = (id: string) =>
   request<{ filename: string; content_type: string; html: string }>('GET', `/admin/orders/${id}/original-content`)
 
@@ -528,5 +534,42 @@ export interface SupportedLanguage {
   label_zh:         string
   label_en:         string
   default_direction: string
+}
+
+export interface TokenUsageItem {
+  job_type:          string
+  model:             string
+  prompt_tokens:     number
+  candidates_tokens: number
+  total_tokens:      number
+  input_rate:        number
+  output_rate:       number
+  cost_usd:          number
+}
+
+export interface TokenUsageResponse {
+  order_id:          string
+  total_prompt:      number
+  total_candidates:  number
+  total_tokens:      number
+  total_cost_usd:    number
+  breakdown:         TokenUsageItem[]
+}
+
+export interface TokenUsageDetailItem {
+  job_type:          string
+  model:             string
+  prompt_tokens:     number
+  candidates_tokens: number
+  total_tokens:      number
+  input_rate:        number
+  output_rate:       number
+  cost_usd:          number
+  created_at:        string
+}
+
+export interface TokenUsageDetailResponse {
+  order_id:          string
+  items:             TokenUsageDetailItem[]
 }
 
