@@ -1,9 +1,9 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
 import { QASegment, Order } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 
 interface QaReviewEditorProps {
   order: Order
@@ -16,6 +16,12 @@ interface QaReviewEditorProps {
   onSubmit: () => Promise<void>
   submitLabel?: string
   onOpenOriginal?: () => void
+  // pagination
+  total?: number
+  pageSize?: number
+  currentPage?: number
+  onPageChange?: (page: number) => void
+  onPageSizeChange?: (size: number) => void
 }
 
 export default function QaReviewEditor({
@@ -29,6 +35,11 @@ export default function QaReviewEditor({
   onSubmit,
   submitLabel = '完成審閱並交付',
   onOpenOriginal,
+  total,
+  pageSize = 50,
+  currentPage = 1,
+  onPageChange,
+  onPageSizeChange,
 }: QaReviewEditorProps) {
   const [saving, setSaving] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
@@ -91,7 +102,9 @@ export default function QaReviewEditor({
             <p className="text-xs text-mist flex items-center gap-2 mt-0.5">
               <LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} />
               <span className="w-1 h-1 rounded-full bg-white/20" />
-              共 {segments.length} 個段落
+              {total != null
+                ?                 `第 ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, total)} 段，共 ${total} 個段落`
+                : `共 ${segments.length} 個段落`}
             </p>
           </div>
         </div>
@@ -227,6 +240,18 @@ export default function QaReviewEditor({
               </div>
             </div>
           ))}
+
+          {/* Pagination */}
+          {total != null && total > 0 && onPageChange && (
+            <Pagination
+              total={total}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={onPageChange}
+              onPageSizeChange={onPageSizeChange}
+              theme="dark"
+            />
+          )}
         </div>
       </div>
     </div>

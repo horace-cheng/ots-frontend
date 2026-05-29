@@ -13,6 +13,7 @@ import {
   TokenUsageItem, TokenUsageResponse, TokenUsageDetailItem
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import OriginalContentViewer from '@/components/original-content-viewer'
 import dayjs from 'dayjs'
 
@@ -132,6 +133,9 @@ export default function AdminOrderDetailPage() {
   const [tokenDetail,      setTokenDetail]      = useState<TokenUsageDetailItem[] | null>(null)
   const [tokenDetailOpen,  setTokenDetailOpen]  = useState(false)
   const [tokenDetailBusy,  setTokenDetailBusy]  = useState(false)
+  const [tokenDetailTotal, setTokenDetailTotal] = useState(0)
+  const [tokenDetailPage,  setTokenDetailPage]  = useState(1)
+  const [tokenDetailSize,  setTokenDetailSize]  = useState(50)
 
   useEffect(() => {
     setBusy(true)
@@ -471,8 +475,8 @@ export default function AdminOrderDetailPage() {
               onClick={() => {
                 if (tokenDetailOpen) { setTokenDetailOpen(false); return }
                 setTokenDetailBusy(true)
-                adminGetTokenUsageDetail(id)
-                  .then(r => { setTokenDetail(r.items); setTokenDetailOpen(true) })
+                adminGetTokenUsageDetail(id, { limit: tokenDetailSize, offset: 0 })
+                  .then(r => { setTokenDetail(r.items); setTokenDetailTotal(r.total); setTokenDetailPage(1); setTokenDetailOpen(true) })
                   .catch(() => {})
                   .finally(() => setTokenDetailBusy(false))
               }}
@@ -516,33 +520,60 @@ export default function AdminOrderDetailPage() {
 
           {/* Detail table */}
           {tokenDetailOpen && tokenDetail && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs font-mono text-mist">
-                <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="py-1.5 pr-3">時間</th>
-                    <th className="py-1.5 pr-3">Job</th>
-                    <th className="py-1.5 pr-3">模型</th>
-                    <th className="py-1.5 pr-3 text-right">Prompt</th>
-                    <th className="py-1.5 pr-3 text-right">Candidates</th>
-                    <th className="py-1.5 pr-3 text-right">Total</th>
-                    <th className="py-1.5 pr-3 text-right">成本</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tokenDetail.map((d, i) => (
-                    <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
-                      <td className="py-1.5 pr-3 whitespace-nowrap">{dayjs(d.created_at).format('HH:mm:ss')}</td>
-                      <td className="py-1.5 pr-3">{d.job_type}</td>
-                      <td className="py-1.5 pr-3">{d.model}</td>
-                      <td className="py-1.5 pr-3 text-right">{d.prompt_tokens.toLocaleString()}</td>
-                      <td className="py-1.5 pr-3 text-right">{d.candidates_tokens.toLocaleString()}</td>
-                      <td className="py-1.5 pr-3 text-right">{d.total_tokens.toLocaleString()}</td>
-                      <td className="py-1.5 pr-3 text-right text-gold">${d.cost_usd.toFixed(6)}</td>
+            <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs font-mono text-mist">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left">
+                      <th className="py-1.5 pr-3">時間</th>
+                      <th className="py-1.5 pr-3">Job</th>
+                      <th className="py-1.5 pr-3">模型</th>
+                      <th className="py-1.5 pr-3 text-right">Prompt</th>
+                      <th className="py-1.5 pr-3 text-right">Candidates</th>
+                      <th className="py-1.5 pr-3 text-right">Total</th>
+                      <th className="py-1.5 pr-3 text-right">成本</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {tokenDetail.map((d, i) => (
+                      <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{dayjs(d.created_at).format('HH:mm:ss')}</td>
+                        <td className="py-1.5 pr-3">{d.job_type}</td>
+                        <td className="py-1.5 pr-3">{d.model}</td>
+                        <td className="py-1.5 pr-3 text-right">{d.prompt_tokens.toLocaleString()}</td>
+                        <td className="py-1.5 pr-3 text-right">{d.candidates_tokens.toLocaleString()}</td>
+                        <td className="py-1.5 pr-3 text-right">{d.total_tokens.toLocaleString()}</td>
+                        <td className="py-1.5 pr-3 text-right text-gold">${d.cost_usd.toFixed(6)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                total={tokenDetailTotal}
+                pageSize={tokenDetailSize}
+                currentPage={tokenDetailPage}
+                onPageChange={async (page) => {
+                  setTokenDetailBusy(true)
+                  try {
+                    const r = await adminGetTokenUsageDetail(id, { limit: tokenDetailSize, offset: (page - 1) * tokenDetailSize })
+                    setTokenDetail(r.items)
+                    setTokenDetailPage(page)
+                  } catch {}
+                  finally { setTokenDetailBusy(false) }
+                }}
+                onPageSizeChange={async (size) => {
+                  setTokenDetailBusy(true)
+                  try {
+                    const r = await adminGetTokenUsageDetail(id, { limit: size, offset: 0 })
+                    setTokenDetail(r.items)
+                    setTokenDetailSize(size)
+                    setTokenDetailPage(1)
+                  } catch {}
+                  finally { setTokenDetailBusy(false) }
+                }}
+                theme="dark"
+              />
             </div>
           )}
         </div>

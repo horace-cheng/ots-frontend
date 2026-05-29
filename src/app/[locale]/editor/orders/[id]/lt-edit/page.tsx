@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -9,6 +9,7 @@ import {
   Order, QASegment, SupportFile, SamplePackage,
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function LtEditPage() {
@@ -29,27 +30,81 @@ export default function LtEditPage() {
   const [pkgSaving, setPkgSaving] = useState(false)
   const [pkgDraft, setPkgDraft] = useState<Partial<SamplePackage>>({})
 
+  // Pagination state
+  const [total,       setTotal]       = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize,    setPageSize]    = useState(50)
+  const [dirtyIndices, setDirtyIndices] = useState<Set<number>>(new Set())
+
+  const fetchSegments = useCallback(async (page: number, size: number) => {
+    const s = await ltGetSegments(id, 'editor', { limit: size, offset: (page - 1) * size })
+    setSegments(s.segments)
+    setTotal(s.total)
+    setDirtyIndices(new Set())
+  }, [id])
+
   useEffect(() => {
     setBusy(true)
     Promise.all([
       ltGetOrder(id, 'editor'),
-      ltGetSegments(id, 'editor'),
-    ]).then(([o, s]) => {
+      fetchSegments(1, pageSize),
+    ]).then(([o]) => {
       setOrder(o)
-      setSegments(s.segments)
     }).catch(e => {
       if (e.message === 'NEXT_REDIRECT') return
       alert(e.message || '訂單載入失敗')
       router.push('/editor/orders')
     }).finally(() => setBusy(false))
-  }, [id])
+  }, [id, pageSize, fetchSegments])
+
+  const getDirtyPayload = useCallback(() =>
+    segments.filter(s => dirtyIndices.has(s.index)).map(s => ({
+      index:           s.index,
+      translated:      s.translated,
+      editor_comments: s.editor_comments,
+    })), [segments, dirtyIndices])
+
+  const saveCurrentPage = useCallback(async () => {
+    const payload = getDirtyPayload()
+    if (payload.length === 0) return
+    await ltUpdateSegments(id, 'editor', payload)
+  }, [id, getDirtyPayload])
 
   const handleSegmentChange = (index: number, value: string) => {
     setSegments(prev => prev.map(s => s.index === index ? { ...s, translated: value } : s))
+    setDirtyIndices(prev => new Set(prev).add(index))
   }
 
   const handleCommentChange = (index: number, value: string) => {
     setSegments(prev => prev.map(s => s.index === index ? { ...s, editor_comments: value } : s))
+    setDirtyIndices(prev => new Set(prev).add(index))
+  }
+
+  const handlePageChange = async (page: number) => {
+    setSaving(true)
+    try {
+      await saveCurrentPage()
+      setCurrentPage(page)
+      await fetchSegments(page, pageSize)
+    } catch (e: any) {
+      alert(e.message || '切換頁面失敗')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePageSizeChange = async (size: number) => {
+    setSaving(true)
+    try {
+      await saveCurrentPage()
+      setPageSize(size)
+      setCurrentPage(1)
+      await fetchSegments(1, size)
+    } catch (e: any) {
+      alert(e.message || '切換頁面失敗')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSaveDraft = async () => {
@@ -60,6 +115,7 @@ export default function LtEditPage() {
         translated: s.translated,
         editor_comments: s.editor_comments,
       })))
+      setDirtyIndices(new Set())
       alert('已儲存草稿')
     } catch (e: any) {
       alert(e.message || '儲存失敗')
@@ -78,6 +134,7 @@ export default function LtEditPage() {
         translated: s.translated,
         editor_comments: s.editor_comments,
       })))
+      setDirtyIndices(new Set())
       await ltCompleteAssignment(id, 'editor')
       alert(isRevision ? '已重新提交，訂單將再次進入校對階段' : '編輯工作已完成，訂單將進入校對階段')
       router.push('/editor/orders')
@@ -123,7 +180,7 @@ export default function LtEditPage() {
             <p className="text-xs text-mist flex items-center gap-2 mt-0.5">
               <LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} />
               <span className="w-1 h-1 rounded-full bg-white/20" />
-              共 {segments.length} 個段落
+              第 {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} 段，共 {total} 個段落
               <span className="w-1 h-1 rounded-full bg-white/20" />
               {order.word_count?.toLocaleString()} 字
               {mustFixCount > 0 && (
@@ -261,6 +318,16 @@ export default function LtEditPage() {
               </div>
             )
           })}
+
+          {/* Pagination */}
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            theme="dark"
+          />
         </div>
       </div>
 

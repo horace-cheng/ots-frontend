@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -8,6 +8,7 @@ import {
   Order, QASegment, UserProfile, getMe
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
+import { Pagination } from '@/components/ui/pagination'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function EditorVerifyPage() {
@@ -22,21 +23,74 @@ export default function EditorVerifyPage() {
   const [error,    setError]    = useState('')
   const [showOriginal, setShowOriginal] = useState(false)
 
+  // Pagination state
+  const [total,       setTotal]       = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize,    setPageSize]    = useState(50)
+  const [dirtyIndices, setDirtyIndices] = useState<Set<number>>(new Set())
+
+  const fetchSegments = useCallback(async (page: number, size: number) => {
+    const s = await editorGetSegments(id, { limit: size, offset: (page - 1) * size })
+    setSegments(s.segments)
+    setTotal(s.total)
+    setDirtyIndices(new Set())
+  }, [id])
+
   useEffect(() => {
     setBusy(true)
     Promise.all([
       editorGetOrder(id),
-      editorGetSegments(id),
+      fetchSegments(1, pageSize),
       getMe(),
-    ]).then(([o, s, user]) => {
+    ]).then(([o, _, user]) => {
       setOrder(o)
-      setSegments(s.segments)
       setMe(user)
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
-  }, [id])
+  }, [id, pageSize, fetchSegments])
+
+  const getDirtyPayload = useCallback(() =>
+    segments.filter(s => dirtyIndices.has(s.index)).map(s => ({
+      index:           s.index,
+      translated:      s.translated,
+      editor_comments: s.editor_comments,
+    })), [segments, dirtyIndices])
+
+  const saveCurrentPage = useCallback(async () => {
+    const payload = getDirtyPayload()
+    if (payload.length === 0) return
+    await editorUpdateSegments(id, payload)
+  }, [id, getDirtyPayload])
 
   const handleSegmentChange = (index: number, field: 'translated' | 'editor_comments', value: string) => {
     setSegments(prev => prev.map(s => s.index === index ? { ...s, [field]: value } : s))
+    setDirtyIndices(prev => new Set(prev).add(index))
+  }
+
+  const handlePageChange = async (page: number) => {
+    setSaving(true)
+    try {
+      await saveCurrentPage()
+      setCurrentPage(page)
+      await fetchSegments(page, pageSize)
+    } catch (e: any) {
+      alert(e.message || '切換頁面失敗')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePageSizeChange = async (size: number) => {
+    setSaving(true)
+    try {
+      await saveCurrentPage()
+      setPageSize(size)
+      setCurrentPage(1)
+      await fetchSegments(1, size)
+    } catch (e: any) {
+      alert(e.message || '切換頁面失敗')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSaveDraft = async () => {
@@ -47,6 +101,7 @@ export default function EditorVerifyPage() {
         translated:      s.translated,
         editor_comments: s.editor_comments,
       })))
+      setDirtyIndices(new Set())
       alert('已儲存草稿')
     } catch (e: any) {
       alert(e.message || '儲存失敗')
@@ -66,6 +121,7 @@ export default function EditorVerifyPage() {
         translated:      s.translated,
         editor_comments: s.editor_comments,
       })))
+      setDirtyIndices(new Set())
       await editorSubmit(id)
       alert(isQA ? '已提交給 Editor' : '審閱完成，訂單已交付')
       router.push('/editor/orders')
@@ -85,6 +141,7 @@ export default function EditorVerifyPage() {
         translated:      s.translated,
         editor_comments: s.editor_comments,
       })))
+      setDirtyIndices(new Set())
       await editorReturn(id)
       alert('已退回 QA 審閱')
       router.push('/editor/orders')
@@ -125,7 +182,7 @@ export default function EditorVerifyPage() {
             <p className="text-xs text-mist flex items-center gap-2 mt-0.5">
               <LangLabel code={order.source_lang} /> → <LangLabel code={order.target_lang} />
               <span className="w-1 h-1 rounded-full bg-white/20" />
-              共 {segments.length} 個段落
+              第 {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} 段，共 {total} 個段落
             </p>
           </div>
         </div>
@@ -231,6 +288,16 @@ export default function EditorVerifyPage() {
               </div>
             </div>
           ))}
+
+          {/* Pagination */}
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            theme="dark"
+          />
         </div>
       </div>
 

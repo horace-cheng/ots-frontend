@@ -144,8 +144,8 @@ export const adminGetPlainTextDownloadUrl = (id: string) =>
 export const adminGetTokenUsage = (orderId: string) =>
   request<TokenUsageResponse>('GET', `/admin/orders/${orderId}/token-usage`)
 
-export const adminGetTokenUsageDetail = (orderId: string) =>
-  request<TokenUsageDetailResponse>('GET', `/admin/orders/${orderId}/token-usage-detail`)
+export const adminGetTokenUsageDetail = (orderId: string, params?: { limit?: number; offset?: number }) =>
+  request<TokenUsageDetailResponse>('GET', `/admin/orders/${orderId}/token-usage-detail`, undefined, params)
 
 export const adminGetOriginalContent = (id: string) =>
   request<{ filename: string; content_type: string; html: string }>('GET', `/admin/orders/${id}/original-content`)
@@ -229,8 +229,8 @@ export const editorGenerateSamplePackage = (orderId: string) =>
 export const downloadSamplePackage = (orderId: string) =>
   request<{ download_url: string; message: string }>('GET', `/orders/${orderId}/sample-package/download`)
 
-export const adminGetSegments = (id: string) =>
-  request<{ segments: QASegment[] }>('GET', `/admin/orders/${id}/segments`)
+export const adminGetSegments = (id: string, params?: { limit?: number; offset?: number }) =>
+  request<{ segments: QASegment[]; total: number }>('GET', `/admin/orders/${id}/segments`, undefined, params)
 
 export const adminUpdateSegments = (id: string, segments: QASegmentUpdate[]) =>
   request<{ message: string }>('PATCH', `/admin/orders/${id}/segments`, { segments })
@@ -264,8 +264,8 @@ export const editorListTeam = () =>
 export const editorGetOrder = (id: string) =>
   request<Order>('GET', `/editor/orders/${id}`)
 
-export const editorGetSegments = (id: string) =>
-  request<{ segments: QASegment[] }>('GET', `/editor/orders/${id}/segments`)
+export const editorGetSegments = (id: string, params?: { limit?: number; offset?: number }) =>
+  request<{ segments: QASegment[]; total: number }>('GET', `/editor/orders/${id}/segments`, undefined, params)
 
 export const editorUpdateSegments = (id: string, segments: QASegmentUpdate[]) =>
   request<{ message: string }>('PATCH', `/editor/orders/${id}/segments`, { segments })
@@ -286,8 +286,8 @@ export const ltListAssignments = (params?: { limit?: number; offset?: number }) 
 export const ltGetOrder = (id: string, role: 'editor' | 'proofreader') =>
   request<Order>('GET', `/editor/lt/orders/${id}`, undefined, { role })
 
-export const ltGetSegments = (id: string, role: 'editor' | 'proofreader') =>
-  request<{ segments: QASegment[] }>('GET', `/editor/lt/orders/${id}/segments`, undefined, { role })
+export const ltGetSegments = (id: string, role: 'editor' | 'proofreader', params?: { limit?: number; offset?: number }) =>
+  request<{ segments: QASegment[]; total: number }>('GET', `/editor/lt/orders/${id}/segments`, undefined, { ...params, role })
 
 export const ltUpdateSegments = (id: string, role: 'editor' | 'proofreader', segments: QASegmentUpdate[]) =>
   request<{ message: string }>('PATCH', `/editor/lt/orders/${id}/segments`, { segments }, { role })
@@ -571,5 +571,6 @@ export interface TokenUsageDetailItem {
 export interface TokenUsageDetailResponse {
   order_id:          string
   items:             TokenUsageDetailItem[]
+  total:             number
 }
 
