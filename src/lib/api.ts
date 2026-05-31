@@ -286,8 +286,16 @@ export const ltListAssignments = (params?: { limit?: number; offset?: number }) 
 export const ltGetOrder = (id: string, role: 'editor' | 'proofreader') =>
   request<Order>('GET', `/editor/lt/orders/${id}`, undefined, { role })
 
+export interface QASegmentListResponse {
+  segments: QASegment[]
+  total: number
+  total_must_fix: number
+  must_fix_indices: number[]
+  all_flags: QAFlag[]
+}
+
 export const ltGetSegments = (id: string, role: 'editor' | 'proofreader', params?: { limit?: number; offset?: number }) =>
-  request<{ segments: QASegment[]; total: number }>('GET', `/editor/lt/orders/${id}/segments`, undefined, { ...params, role })
+  request<QASegmentListResponse>('GET', `/editor/lt/orders/${id}/segments`, undefined, { ...params, role })
 
 export const ltUpdateSegments = (id: string, role: 'editor' | 'proofreader', segments: QASegmentUpdate[]) =>
   request<{ message: string }>('PATCH', `/editor/lt/orders/${id}/segments`, { segments }, { role })

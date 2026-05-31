@@ -40,11 +40,16 @@ export default function QAFlagsPage() {
   }
 
   const FLAG_TYPE_LABELS: Record<string, string> = {
-    missing_segment:       '漏譯',
-    length_ratio:          '長度比例異常',
-    semantic_drift:        '語意漂移',
-    terminology_mismatch:  '術語不一致',
-    readability_low:       '可讀性低',
+    missing_segment:          '漏譯',
+    length_ratio:             '長度比例異常',
+    semantic_drift:           '語意漂移',
+    terminology_mismatch:     '術語不一致',
+    readability_low:          '可讀性低',
+    untranslated:             '未翻譯',
+    partial_untranslated:     '部分未翻譯',
+    missing_translation:      '漏譯',
+    segment_count_mismatch:   '段落數不符',
+    number_inconsistency:     '數字不一致',
   }
 
   return (

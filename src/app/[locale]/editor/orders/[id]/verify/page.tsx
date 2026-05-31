@@ -241,7 +241,18 @@ export default function EditorVerifyPage() {
                           <span className={`px-1 rounded text-[9px] font-bold ${
                             f.flag_level === 'must_fix' ? 'bg-coral text-white' : 'bg-amber-400 text-night'
                           }`}>{f.flag_level}</span>
-                          <span className="text-[10px] text-mist">{f.flag_type}</span>
+                          <span className="text-[10px] text-mist">{{
+                            missing_segment: '漏譯',
+                            untranslated: '未翻譯',
+                            partial_untranslated: '部分未翻譯',
+                            missing_translation: '漏譯',
+                            segment_count_mismatch: '段落數不符',
+                            number_inconsistency: '數字不一致',
+                            length_ratio: '長度比例異常',
+                            semantic_drift: '語意漂移',
+                            terminology_mismatch: '術語不一致',
+                            readability_low: '可讀性低',
+                          }[f.flag_type] ?? f.flag_type}</span>
                         </div>
                         {f.reviewer_note && <p className="text-[11px] text-gold italic">"{f.reviewer_note}"</p>}
                       </div>

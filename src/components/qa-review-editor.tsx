@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { QASegment, Order } from '@/lib/api'
+import { QASegment, Order, QAFlag } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
 
@@ -22,6 +22,12 @@ interface QaReviewEditorProps {
   currentPage?: number
   onPageChange?: (page: number) => void
   onPageSizeChange?: (size: number) => void
+  // must_fix navigation
+  totalMustFix?: number
+  mustFixIndices?: number[]
+  onMustFixNavigate?: (direction: 'prev' | 'next') => void
+  // all flags for QA result panel
+  allFlags?: QAFlag[]
 }
 
 export default function QaReviewEditor({
@@ -40,14 +46,29 @@ export default function QaReviewEditor({
   currentPage = 1,
   onPageChange,
   onPageSizeChange,
+  totalMustFix = 0,
+  mustFixIndices = [],
+  onMustFixNavigate,
+  allFlags = [],
 }: QaReviewEditorProps) {
   const [saving, setSaving] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
+  const [showQaResult, setShowQaResult] = useState(false)
 
   const handleSegmentChange = (index: number, field: 'translated' | 'comments', value: string) => {
     onSegmentsChange(
       segments.map(s => s.index === index ? { ...s, [field]: value } : s)
     )
+  }
+
+  const jumpToSegment = (paragraphIndex: number) => {
+    const targetPage = Math.floor(paragraphIndex / pageSize) + 1
+    setShowQaResult(false)
+    onPageChange?.(targetPage)
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`segment-${paragraphIndex}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
   }
 
   const handleSave = async (isDone = false) => {
@@ -126,6 +147,10 @@ export default function QaReviewEditor({
               原始內容
             </button>
           )}
+          <button onClick={() => setShowQaResult(true)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${totalMustFix > 0 ? 'bg-coral/10 border-coral/30 text-coral' : 'border-white/10 text-mist hover:text-paper hover:bg-white/5'}`}>
+            QA 結果{totalMustFix > 0 && ` (${totalMustFix})`}
+          </button>
           <StatusBadge status={order.status} />
           {!isReadOnly && (
             <>
@@ -155,11 +180,30 @@ export default function QaReviewEditor({
         </div>
       )}
 
+      {/* Must-fix Navigation */}
+      {totalMustFix > 0 && onMustFixNavigate && (
+        <div className="shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-coral/10 border border-coral/20">
+          <span className="text-sm font-bold text-coral">{totalMustFix} 個待修正段落</span>
+          <span className="text-xs text-mist">
+            （第 {mustFixIndices.map(i => Math.floor(i / pageSize) + 1).filter((v, k, a) => a.indexOf(v) === k).join('、')} 頁）
+          </span>
+          <div className="flex-1" />
+          <button onClick={() => onMustFixNavigate('prev')}
+            className="px-3 py-1.5 rounded-lg border border-coral/30 text-xs font-medium text-coral hover:bg-coral/10 transition-all">
+            上一處修正
+          </button>
+          <button onClick={() => onMustFixNavigate('next')}
+            className="px-3 py-1.5 rounded-lg bg-coral text-xs font-bold text-white hover:bg-coral-light hover:scale-105 transition-all">
+            下一處修正
+          </button>
+        </div>
+      )}
+
       {/* Editor Content */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto p-6 space-y-4">
           {segments.map((seg, i) => (
-            <div key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 30}ms` }}>
+            <div id={`segment-${seg.index}`} key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 30}ms` }}>
               {/* Left: Source */}
               <div className="relative rounded-xl border border-white/5 bg-white/[0.02] p-4 transition-colors group-hover:border-white/10">
                 <div className="absolute top-3 left-3 text-[10px] font-mono text-mist/30 select-none">
@@ -195,16 +239,30 @@ export default function QaReviewEditor({
                   {/* QA Flags Overlay */}
                   {seg.flags.length > 0 && (
                     <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
-                      {seg.flags.map(f => (
+                      {seg.flags.map(f => {
+                        const flagLabel =
+                          f.flag_type === 'missing_segment' ? '漏譯' :
+                          f.flag_type === 'untranslated' ? '未翻譯' :
+                          f.flag_type === 'partial_untranslated' ? '部分未翻譯' :
+                          f.flag_type === 'missing_translation' ? '漏譯' :
+                          f.flag_type === 'segment_count_mismatch' ? '段落數不符' :
+                          f.flag_type === 'number_inconsistency' ? '數字不一致' :
+                          f.flag_type === 'length_ratio' ? '長度比例異常' :
+                          f.flag_type === 'semantic_drift' ? '語意漂移' :
+                          f.flag_type === 'terminology_mismatch' ? '術語不一致' :
+                          f.flag_type === 'readability_low' ? '可讀性低' :
+                          f.flag_type;
+                        return (
                         <div key={f.id} className="flex items-start gap-2 text-xs">
                           <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter ${
                             f.flag_level === 'must_fix' ? 'bg-coral text-white' : 'bg-amber-400 text-night'
                           }`}>
-                            {f.flag_type}
+                            {flagLabel}
                           </span>
                           <span className="text-mist">{f.flag_level === 'must_fix' ? '必須修正' : '建議審閱'}</span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -254,6 +312,88 @@ export default function QaReviewEditor({
           )}
         </div>
       </div>
+
+      {/* QA Result Drawer */}
+      {showQaResult && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowQaResult(false)} />
+          <div className="relative w-full max-w-lg bg-[#111122] border-l-2 border-coral/40 shadow-2xl shadow-coral/5 overflow-auto">
+            <div className="sticky top-0 bg-[#111122]/95 backdrop-blur-md border-b border-coral/20 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 rounded bg-coral" />
+                <h2 className="text-lg font-bold text-white">QA 結果</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-white/50">{allFlags.length} 個標記</span>
+                <button onClick={() => setShowQaResult(false)}
+                  className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-3">
+              {allFlags.length === 0 && (
+                <p className="text-sm text-white/40 text-center py-8">無 QA 標記</p>
+              )}
+              {allFlags
+                .slice()
+                .sort((a, b) => {
+                  if (a.flag_level !== b.flag_level) return a.flag_level === 'must_fix' ? -1 : 1
+                  return a.paragraph_index - b.paragraph_index
+                })
+                .map((flag) => {
+                  const flagLabel =
+                    flag.flag_type === 'missing_segment' ? '漏譯' :
+                    flag.flag_type === 'untranslated' ? '未翻譯' :
+                    flag.flag_type === 'partial_untranslated' ? '部分未翻譯' :
+                    flag.flag_type === 'missing_translation' ? '漏譯' :
+                    flag.flag_type === 'segment_count_mismatch' ? '段落數不符' :
+                    flag.flag_type === 'number_inconsistency' ? '數字不一致' :
+                    flag.flag_type === 'length_ratio' ? '長度比例異常' :
+                    flag.flag_type === 'semantic_drift' ? '語意漂移' :
+                    flag.flag_type === 'terminology_mismatch' ? '術語不一致' :
+                    flag.flag_type === 'readability_low' ? '可讀性低' : flag.flag_type;
+                  return (
+                    <div key={flag.id} className={`rounded-xl border-2 p-4 transition-colors ${
+                      flag.resolved
+                        ? 'border-green-500/30 bg-green-500/10'
+                        : flag.flag_level === 'must_fix'
+                        ? 'border-coral/40 bg-coral/10 shadow-[0_0_12px_rgba(255,107,107,0.08)]'
+                        : 'border-amber-500/30 bg-amber-500/10'
+                    }`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono text-white/60 bg-white/5 px-1.5 py-0.5 rounded">#{flag.paragraph_index + 1}</span>
+                          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                            flag.flag_level === 'must_fix' ? 'bg-coral text-white' : 'bg-amber-400 text-black'
+                          }`}>{flagLabel}</span>
+                          <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
+                            flag.resolved ? 'bg-green-500/20 text-green-300' : 'bg-white/10 text-white/60'
+                          }`}>
+                            {flag.resolved ? '已處理' : flag.flag_level === 'must_fix' ? '待修正' : '待審閱'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => jumpToSegment(flag.paragraph_index)}
+                          className="shrink-0 px-3 py-1 rounded-lg border border-coral/30 text-[11px] font-bold text-coral hover:bg-coral/20 hover:border-coral/60 transition-all">
+                          跳至段落
+                        </button>
+                      </div>
+                      {flag.source_segment && (
+                        <p className="mt-2 text-xs text-white/50 line-clamp-2">{flag.source_segment}</p>
+                      )}
+                      {flag.translated_segment && (
+                        <p className="mt-1 text-xs text-white/30 line-clamp-2">{flag.translated_segment}</p>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
