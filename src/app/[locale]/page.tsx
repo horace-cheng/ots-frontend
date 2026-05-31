@@ -103,7 +103,25 @@ export default function HomePage() {
       return
     }
     setError('')
-    setWordCount(await extractTextAndCountWords(f))
+    const wc = await extractTextAndCountWords(f)
+    if (isLT) {
+      if (wc >= 200000) {
+        setError('字數超過 200,000 字上限，請聯繫客服了解更多資訊。')
+        setFile(null)
+        setWordCount(0)
+        e.target.value = ''
+        return
+      }
+    } else {
+      if (wc >= 5000) {
+        setError(`Fast Track 字數上限為 5,000 字（您的文件約 ${wc.toLocaleString()} 字），建議選擇 Literary Track 或拆分文件。`)
+        setFile(null)
+        setWordCount(0)
+        e.target.value = ''
+        return
+      }
+    }
+    setWordCount(wc)
   }
 
   async function handleSupportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -139,6 +157,15 @@ export default function HomePage() {
     const totalSize = file.size + supportFiles.reduce((s, sf) => s + sf.file.size, 0)
     if (totalSize > MAX_ORDER_SIZE) {
       setError(`所有檔案總和超過 ${MAX_ORDER_SIZE / (1024 * 1024)} MB 上限（${(totalSize / (1024 * 1024)).toFixed(1)} MB）`)
+      return
+    }
+
+    if (isLT && wordCount >= 200000) {
+      setError('字數超過 200,000 字上限，請聯繫客服了解更多資訊。')
+      return
+    }
+    if (!isLT && wordCount >= 5000) {
+      setError(`Fast Track 字數上限為 5,000 字，建議選擇 Literary Track 或拆分文件。`)
       return
     }
 
@@ -378,6 +405,9 @@ export default function HomePage() {
 
               <div style={{ marginBottom: '0.75rem' }}>
                 <label className="field-label">上傳原文檔案</label>
+                <p style={{ fontSize: '0.7rem', color: isLT ? '#7c3aed' : '#b5882a', marginBottom: '0.3rem' }}>
+                  {isLT ? '字數上限 200,000 字，超過請聯繫客服' : '字數上限 5,000 字'}
+                </p>
                 <input type="file"             accept=".txt,.docx,.pdf,.html,.md" onChange={handleFileChange}
                   style={{ display: 'block', width: '100%', fontSize: '0.8rem', color: '#64748b', cursor: 'pointer', padding: '0.375rem 0' }} />
                 {file && (
