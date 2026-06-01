@@ -230,6 +230,15 @@ label.field-label {
 .step-dot.done  { background: var(--gold); border-color: var(--gold); }
 .step-dot.active { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(184,133,42,0.15); }
 
+/* ── Hide scrollbar (keep scroll functionality) ──────────────────────────────── */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Utility ──────────────────────────────────────────────────────────────────── */
 .divider {
   height: 1px;

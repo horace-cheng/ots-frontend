@@ -10,6 +10,7 @@ import {
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
+import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function LtProofreadPage() {
@@ -318,11 +319,10 @@ export default function LtProofreadPage() {
                     <div className="text-xs text-blue-300/80 leading-relaxed whitespace-pre-wrap">{seg.editor_comments}</div>
                   </div>
                 )}
-                <textarea
+                <AutoResizeTextarea
                   value={seg.proofreader_comments || ''}
                   onChange={e => handleCommentChange(seg.index, e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300 leading-relaxed resize-none focus:outline-none focus:border-amber-500/50 placeholder-amber-500/30"
+                  className="w-full px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300 leading-relaxed resize-none focus:outline-none focus:border-amber-500/50 placeholder-amber-500/30 no-scrollbar"
                   placeholder="校對意見..."
                 />
               </div>

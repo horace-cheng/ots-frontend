@@ -10,6 +10,7 @@ import {
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
+import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function LtEditPage() {
@@ -342,12 +343,11 @@ export default function LtEditPage() {
                 {/* Right: Editor Input */}
                 <div className="flex flex-col gap-2">
                   <div className={`relative rounded-xl border p-4 transition-all focus-within:ring-2 focus-within:ring-gold/20 focus-within:border-gold/50 ${isUntranslated ? 'border-coral/30 bg-coral/[0.03]' : 'border-white/10 bg-white/5'}`}>
-                    <textarea
+                    <AutoResizeTextarea
                       value={seg.translated}
                       onChange={(e) => handleSegmentChange(seg.index, e.target.value)}
-                      rows={Math.max(3, Math.ceil(seg.translated.length / 50))}
                       placeholder="修正譯文..."
-                      className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30"
+                      className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30 no-scrollbar"
                     />
                   </div>
 
@@ -363,12 +363,11 @@ export default function LtEditPage() {
                   )}
 
                   {/* Editor Comments */}
-                <textarea
+                <AutoResizeTextarea
                   value={seg.editor_comments || ''}
                   onChange={(e) => handleCommentChange(seg.index, e.target.value)}
-                  rows={2}
                   placeholder={hasMustFix ? '請填寫修正說明（必填）' : '給校對的備註（選填）'}
-                  className={`px-3 py-2 rounded-lg bg-white/5 border text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:outline-none resize-none ${hasMustFix ? 'border-coral/30 focus:border-coral/50' : 'border-white/10 focus:border-gold/30'}`}
+                  className={`px-3 py-2 rounded-lg bg-white/5 border text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:outline-none resize-none no-scrollbar ${hasMustFix ? 'border-coral/30 focus:border-coral/50' : 'border-white/10 focus:border-gold/30'}`}
                 />
                 </div>
               </div>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { QASegment, Order, QAFlag } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
+import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
 
 interface QaReviewEditorProps {
   order: Order
@@ -227,13 +228,12 @@ export default function QaReviewEditor({
                     ? 'border-coral/30 bg-coral/5 focus-within:border-coral' 
                     : `border-white/10 bg-white/5 ${accentFlagBorder}`
                 }`}>
-                  <textarea
+                  <AutoResizeTextarea
                     value={seg.translated}
                     onChange={(e) => handleSegmentChange(seg.index, 'translated', e.target.value)}
                     readOnly={isReadOnly}
-                    rows={Math.max(3, Math.ceil(seg.translated.length / 50))}
                     placeholder="輸入譯文..."
-                    className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30"
+                    className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30 no-scrollbar"
                   />
                   
                   {/* QA Flags Overlay */}
@@ -283,13 +283,12 @@ export default function QaReviewEditor({
                 </div>
 
                 {/* Segment Comments */}
-                <textarea
+                <AutoResizeTextarea
                   value={seg.comments || ''}
                   onChange={(e) => handleSegmentChange(seg.index, 'comments', e.target.value)}
                   readOnly={isReadOnly}
-                  rows={2}
                   placeholder={seg.flags.length > 0 ? "添加審閱備註（必填）" : "添加備註（選填）"}
-                  className={`px-3 py-2 rounded-lg bg-white/5 border text-xs transition-all placeholder:text-mist/20 resize-none ${
+                  className={`px-3 py-2 rounded-lg bg-white/5 border text-xs transition-all placeholder:text-mist/20 resize-none no-scrollbar ${
                     seg.flags.length > 0 && !seg.comments?.trim() 
                       ? 'border-coral/40 focus:border-coral focus:ring-1 focus:ring-coral/20' 
                       : 'border-white/5 focus:text-paper focus:border-gold/30 focus:outline-none'

@@ -9,6 +9,7 @@ import {
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
+import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function EditorVerifyPage() {
@@ -264,12 +265,11 @@ export default function EditorVerifyPage() {
               {/* Right: Editor Input */}
               <div className="flex flex-col gap-2">
                 <div className="relative rounded-xl border border-white/10 bg-white/5 p-4 transition-all focus-within:ring-2 focus-within:ring-gold/20 focus-within:border-gold/50">
-                  <textarea
+                  <AutoResizeTextarea
                     value={seg.translated}
                     onChange={(e) => handleSegmentChange(seg.index, 'translated', e.target.value)}
-                    rows={Math.max(3, Math.ceil(seg.translated.length / 50))}
                     placeholder="修正譯文..."
-                    className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30"
+                    className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30 no-scrollbar"
                   />
                   
                   {/* Raw LLM Reference */}
@@ -289,12 +289,11 @@ export default function EditorVerifyPage() {
                 </div>
 
                 {/* Editor Comments */}
-                <textarea
+                <AutoResizeTextarea
                   value={seg.editor_comments || ''}
                   onChange={(e) => handleSegmentChange(seg.index, 'editor_comments', e.target.value)}
-                  rows={2}
                   placeholder="給 QA 的回饋或修改備註（選填）"
-                  className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:border-gold/30 focus:outline-none resize-none"
+                  className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs transition-all placeholder:text-mist/20 focus:text-paper focus:border-gold/30 focus:outline-none resize-none no-scrollbar"
                 />
               </div>
             </div>
