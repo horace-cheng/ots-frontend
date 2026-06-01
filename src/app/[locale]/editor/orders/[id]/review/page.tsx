@@ -21,6 +21,10 @@ export default function QaReviewPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize,    setPageSize]    = useState(50)
   const [dirtyIndices, setDirtyIndices] = useState<Set<number>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ index: number; source: string }[]>([])
+  const [crossPageTotal, setCrossPageTotal] = useState(0)
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null)
 
   const fetchSegments = useCallback(async (page: number, size: number) => {
     const s = await editorGetSegments(id, { limit: size, offset: (page - 1) * size })
@@ -61,7 +65,6 @@ export default function QaReviewPage() {
   }, [id, getDirtyPayload])
 
   const handleSegmentsChange = (updated: QASegment[]) => {
-    // Detect which segments changed
     const newDirty = new Set(dirtyIndices)
     for (let i = 0; i < updated.length; i++) {
       const old = segments.find(s => s.index === updated[i].index)
@@ -71,6 +74,32 @@ export default function QaReviewPage() {
     }
     setDirtyIndices(newDirty)
     setSegments(updated)
+  }
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q)
+    if (q) {
+      editorGetSegments(id, { limit: 200, offset: 0, q, search_all: true }).then(s => {
+        setSearchResults(s.segments.map(seg => ({ index: seg.index, source: seg.source })))
+        setCrossPageTotal(s.total)
+      }).catch(() => {})
+    } else {
+      setSearchResults([])
+      setCrossPageTotal(0)
+    }
+  }
+
+  const handleSelectResult = async (paragraphIndex: number) => {
+    const targetPage = Math.floor(paragraphIndex / pageSize) + 1
+    if (targetPage !== currentPage) {
+      await handlePageChange(targetPage)
+    }
+    setHighlightedIndex(paragraphIndex)
+    setTimeout(() => setHighlightedIndex(null), 2600)
+    setTimeout(() => {
+      const el = document.getElementById(`segment-${paragraphIndex}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
   }
 
   const handlePageChange = async (page: number) => {
@@ -128,6 +157,12 @@ export default function QaReviewPage() {
       currentPage={currentPage}
       onPageChange={handlePageChange}
       onPageSizeChange={handlePageSizeChange}
+      searchQuery={searchQuery}
+      onSearchChange={handleSearchChange}
+      searchResults={searchResults}
+      searchTotal={crossPageTotal}
+      highlightedIndex={highlightedIndex}
+      onSelectResult={handleSelectResult}
     />
   )
 }

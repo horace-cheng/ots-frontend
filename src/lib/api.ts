@@ -15,7 +15,7 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  params?: Record<string, string | number | undefined> | boolean,
+  params?: Record<string, string | number | boolean | undefined> | boolean,
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const noAuth = typeof params === 'boolean' ? params : false
@@ -229,7 +229,7 @@ export const editorGenerateSamplePackage = (orderId: string) =>
 export const downloadSamplePackage = (orderId: string) =>
   request<{ download_url: string; message: string }>('GET', `/orders/${orderId}/sample-package/download`)
 
-export const adminGetSegments = (id: string, params?: { limit?: number; offset?: number }) =>
+export const adminGetSegments = (id: string, params?: { limit?: number; offset?: number; q?: string; search_all?: boolean }) =>
   request<{ segments: QASegment[]; total: number }>('GET', `/admin/orders/${id}/segments`, undefined, params)
 
 export const adminUpdateSegments = (id: string, segments: QASegmentUpdate[]) =>
@@ -264,7 +264,7 @@ export const editorListTeam = () =>
 export const editorGetOrder = (id: string) =>
   request<Order>('GET', `/editor/orders/${id}`)
 
-export const editorGetSegments = (id: string, params?: { limit?: number; offset?: number }) =>
+export const editorGetSegments = (id: string, params?: { limit?: number; offset?: number; q?: string; search_all?: boolean }) =>
   request<{ segments: QASegment[]; total: number }>('GET', `/editor/orders/${id}/segments`, undefined, params)
 
 export const editorUpdateSegments = (id: string, segments: QASegmentUpdate[]) =>
@@ -294,7 +294,7 @@ export interface QASegmentListResponse {
   all_flags: QAFlag[]
 }
 
-export const ltGetSegments = (id: string, role: 'editor' | 'proofreader', params?: { limit?: number; offset?: number }) =>
+export const ltGetSegments = (id: string, role: 'editor' | 'proofreader', params?: { limit?: number; offset?: number; q?: string; search_all?: boolean }) =>
   request<QASegmentListResponse>('GET', `/editor/lt/orders/${id}/segments`, undefined, { ...params, role })
 
 export const ltUpdateSegments = (id: string, role: 'editor' | 'proofreader', segments: QASegmentUpdate[]) =>

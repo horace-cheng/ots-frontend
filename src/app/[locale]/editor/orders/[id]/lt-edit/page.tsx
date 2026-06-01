@@ -11,6 +11,7 @@ import {
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
 import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
+import { SearchBar } from '@/components/search-bar'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function LtEditPage() {
@@ -39,8 +40,12 @@ export default function LtEditPage() {
   const [totalMustFix,   setTotalMustFix]   = useState(0)
   const [mustFixIndices, setMustFixIndices] = useState<number[]>([])
   const [allFlags,       setAllFlags]       = useState<QAFlag[]>([])
+  const [searchQuery,    setSearchQuery]    = useState('')
 
   const [showQaResult,   setShowQaResult]   = useState(false)
+  const [searchResults, setSearchResults] = useState<{ index: number; source: string }[]>([])
+  const [crossPageTotal, setCrossPageTotal] = useState(0)
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null)
 
   const fetchSegments = useCallback(async (page: number, size: number) => {
     const s = await ltGetSegments(id, 'editor', { limit: size, offset: (page - 1) * size })
@@ -89,6 +94,33 @@ export default function LtEditPage() {
     setDirtyIndices(prev => new Set(prev).add(index))
   }
 
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q)
+    if (q) {
+      ltGetSegments(id, 'editor', { limit: 200, offset: 0, q, search_all: true }).then(s => {
+        setSearchResults(s.segments.map(seg => ({ index: seg.index, source: seg.source })))
+        setCrossPageTotal(s.total)
+      }).catch(() => {})
+    } else {
+      setSearchResults([])
+      setCrossPageTotal(0)
+    }
+  }
+
+  const handleSelectResult = async (paragraphIndex: number) => {
+    const targetPage = Math.floor(paragraphIndex / pageSize) + 1
+    setShowQaResult(false)
+    if (targetPage !== currentPage) {
+      await handlePageChange(targetPage)
+    }
+    setHighlightedIndex(paragraphIndex)
+    setTimeout(() => setHighlightedIndex(null), 2600)
+    setTimeout(() => {
+      const el = document.getElementById(`segment-${paragraphIndex}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+  }
+
   const handlePageChange = async (page: number) => {
     setSaving(true)
     try {
@@ -106,10 +138,12 @@ export default function LtEditPage() {
     const targetPage = Math.floor(paragraphIndex / pageSize) + 1
     setShowQaResult(false)
     await handlePageChange(targetPage)
-    requestAnimationFrame(() => {
+    setHighlightedIndex(paragraphIndex)
+    setTimeout(() => setHighlightedIndex(null), 2600)
+    setTimeout(() => {
       const el = document.getElementById(`segment-${paragraphIndex}`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
+    }, 100)
   }
 
   const handlePageSizeChange = async (size: number) => {
@@ -302,13 +336,19 @@ export default function LtEditPage() {
       {/* Editor Content */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto p-6 space-y-4">
+          <div className="sticky top-0 z-10 bg-night/90 backdrop-blur-sm rounded-xl pb-3 mb-2">
+            <SearchBar value={searchQuery} onChange={handleSearchChange} onSelectResult={handleSelectResult} results={searchResults} totalMatches={searchQuery ? crossPageTotal : undefined} theme="purple" />
+          </div>
           {segments.map((seg) => {
             const unresolvedFlags = (seg.flags || []).filter(f => !f.resolved)
             const hasMustFix = unresolvedFlags.some(f => f.flag_level === 'must_fix')
             const isUntranslated = unresolvedFlags.some(f => f.flag_type === 'untranslated')
 
             return (
-              <div id={`segment-${seg.index}`} key={seg.index} className={`group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+              <div id={`segment-${seg.index}`} key={seg.index} className={`group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300`} style={{
+                transition: 'box-shadow 2.5s ease-out, background 2.5s ease-out',
+                ...(seg.index === highlightedIndex ? { boxShadow: 'inset 0 0 0 2px rgba(184,133,42,0.5), 0 0 20px rgba(184,133,42,0.2)', background: 'rgba(184,133,42,0.05)', borderRadius: '0.75rem' } : {}),
+              }}>
                 {/* Left: Source */}
                 <div className={`relative rounded-xl border p-4 transition-colors ${isUntranslated ? 'border-coral/40 bg-coral/[0.04]' : 'border-white/5 bg-white/[0.02]'} group-hover:${isUntranslated ? 'border-coral/60' : 'border-white/10'}`}>
                   <div className="absolute top-3 left-3 text-[10px] font-mono select-none">

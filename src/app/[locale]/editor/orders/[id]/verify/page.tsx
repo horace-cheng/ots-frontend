@@ -10,6 +10,7 @@ import {
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
 import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
+import { SearchBar } from '@/components/search-bar'
 import OriginalContentViewer from '@/components/original-content-viewer'
 
 export default function EditorVerifyPage() {
@@ -29,6 +30,10 @@ export default function EditorVerifyPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize,    setPageSize]    = useState(50)
   const [dirtyIndices, setDirtyIndices] = useState<Set<number>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ index: number; source: string }[]>([])
+  const [crossPageTotal, setCrossPageTotal] = useState(0)
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null)
 
   const fetchSegments = useCallback(async (page: number, size: number) => {
     const s = await editorGetSegments(id, { limit: size, offset: (page - 1) * size })
@@ -65,6 +70,32 @@ export default function EditorVerifyPage() {
   const handleSegmentChange = (index: number, field: 'translated' | 'editor_comments', value: string) => {
     setSegments(prev => prev.map(s => s.index === index ? { ...s, [field]: value } : s))
     setDirtyIndices(prev => new Set(prev).add(index))
+  }
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q)
+    if (q) {
+      editorGetSegments(id, { limit: 200, offset: 0, q, search_all: true }).then(s => {
+        setSearchResults(s.segments.map(seg => ({ index: seg.index, source: seg.source })))
+        setCrossPageTotal(s.total)
+      }).catch(() => {})
+    } else {
+      setSearchResults([])
+      setCrossPageTotal(0)
+    }
+  }
+
+  const handleSelectResult = async (paragraphIndex: number) => {
+    const targetPage = Math.floor(paragraphIndex / pageSize) + 1
+    if (targetPage !== currentPage) {
+      await handlePageChange(targetPage)
+    }
+    setHighlightedIndex(paragraphIndex)
+    setTimeout(() => setHighlightedIndex(null), 2600)
+    setTimeout(() => {
+      const el = document.getElementById(`segment-${paragraphIndex}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
   }
 
   const handlePageChange = async (page: number) => {
@@ -216,8 +247,14 @@ export default function EditorVerifyPage() {
       {/* Editor Content */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto p-6 space-y-4">
+          <div className="sticky top-0 z-10 bg-night/90 backdrop-blur-sm rounded-xl pb-3 mb-2">
+            <SearchBar value={searchQuery} onChange={handleSearchChange} onSelectResult={handleSelectResult} results={searchResults} totalMatches={searchQuery ? crossPageTotal : undefined} theme="gold" />
+          </div>
           {segments.map((seg, i) => (
-            <div key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div id={`segment-${seg.index}`} key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{
+              transition: 'box-shadow 2.5s ease-out, background 2.5s ease-out',
+              ...(seg.index === highlightedIndex ? { boxShadow: 'inset 0 0 0 2px rgba(184,133,42,0.5), 0 0 20px rgba(184,133,42,0.2)', background: 'rgba(184,133,42,0.05)', borderRadius: '0.75rem' } : {}),
+            }}>
               {/* Left: Source */}
               <div className="relative rounded-xl border border-white/5 bg-white/[0.02] p-4 transition-colors group-hover:border-white/10">
                 <div className="absolute top-3 left-3 text-[10px] font-mono text-mist/30 select-none">

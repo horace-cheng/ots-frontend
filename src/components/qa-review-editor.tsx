@@ -5,6 +5,7 @@ import { QASegment, Order, QAFlag } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
 import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
+import { SearchBar } from '@/components/search-bar'
 
 interface QaReviewEditorProps {
   order: Order
@@ -29,6 +30,13 @@ interface QaReviewEditorProps {
   onMustFixNavigate?: (direction: 'prev' | 'next') => void
   // all flags for QA result panel
   allFlags?: QAFlag[]
+  // search
+  searchQuery?: string
+  onSearchChange?: (q: string) => void
+  searchResults?: { index: number; source: string }[]
+  searchTotal?: number
+  highlightedIndex?: number | null
+  onSelectResult?: (index: number) => void
 }
 
 export default function QaReviewEditor({
@@ -51,6 +59,12 @@ export default function QaReviewEditor({
   mustFixIndices = [],
   onMustFixNavigate,
   allFlags = [],
+  searchQuery = '',
+  onSearchChange,
+  searchResults,
+  searchTotal,
+  highlightedIndex,
+  onSelectResult,
 }: QaReviewEditorProps) {
   const [saving, setSaving] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
@@ -203,8 +217,17 @@ export default function QaReviewEditor({
       {/* Editor Content */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto p-6 space-y-4">
+          {onSearchChange && (
+            <div className="sticky top-0 z-10 bg-night/90 backdrop-blur-sm rounded-xl pb-3 mb-2">
+              <SearchBar value={searchQuery} onChange={onSearchChange} onSelectResult={onSelectResult} results={searchResults} totalMatches={searchQuery ? searchTotal : undefined} theme={accent === 'purple' ? 'purple' : 'gold'} />
+            </div>
+          )}
           {segments.map((seg, i) => (
-            <div id={`segment-${seg.index}`} key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 30}ms` }}>
+            <div id={`segment-${seg.index}`} key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{
+              animationDelay: `${i * 30}ms`,
+              transition: 'box-shadow 2.5s ease-out, background 2.5s ease-out',
+              ...(seg.index === highlightedIndex ? { boxShadow: 'inset 0 0 0 2px rgba(184,133,42,0.5), 0 0 20px rgba(184,133,42,0.2)', background: 'rgba(184,133,42,0.05)', borderRadius: '0.75rem' } : {}),
+            }}>
               {/* Left: Source */}
               <div className="relative rounded-xl border border-white/5 bg-white/[0.02] p-4 transition-colors group-hover:border-white/10">
                 <div className="absolute top-3 left-3 text-[10px] font-mono text-mist/30 select-none">
