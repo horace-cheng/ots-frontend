@@ -141,6 +141,9 @@ export const adminGetBilingualDownloadUrl = (id: string) =>
 export const adminGetPlainTextDownloadUrl = (id: string) =>
   request<{ signed_url: string }>('GET', `/admin/orders/${id}/plain-text-download-url`)
 
+export const adminGetPipelineProgress = (id: string) =>
+  request<PipelineProgress>('GET', `/admin/orders/${id}/pipeline-progress`)
+
 export const adminGetTokenUsage = (orderId: string) =>
   request<TokenUsageResponse>('GET', `/admin/orders/${orderId}/token-usage`)
 
@@ -580,5 +583,13 @@ export interface TokenUsageDetailResponse {
   order_id:          string
   items:             TokenUsageDetailItem[]
   total:             number
+}
+
+export interface PipelineProgress {
+  status:             'no_batches' | 'in_progress' | 'complete'
+  total_batches:      number
+  completed_batches:  number
+  total_segments:     number
+  completed_segments: number
 }
 

@@ -6,7 +6,7 @@ import {
   ltGetOrder, ltGetSegments, ltUpdateSegments, ltCompleteAssignment, ltRejectAssignment,
   ltGetOriginalContent, ltListSupportFiles, ltGetSupportFileContent,
   getSamplePackage, updateSamplePackage,
-  Order, QASegment, SupportFile, SamplePackage,
+  Order, QASegment, QAFlag, SupportFile, SamplePackage,
 } from '@/lib/api'
 import { StatusBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
@@ -44,11 +44,18 @@ export default function LtProofreadPage() {
   const [searchResults, setSearchResults] = useState<{ index: number; source: string }[]>([])
   const [crossPageTotal, setCrossPageTotal] = useState(0)
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null)
+  const [totalMustFix,   setTotalMustFix]   = useState(0)
+  const [mustFixIndices, setMustFixIndices] = useState<number[]>([])
+  const [allFlags,       setAllFlags]       = useState<QAFlag[]>([])
+  const [showQaResult,   setShowQaResult]   = useState(false)
 
   const fetchSegments = useCallback(async (page: number, size: number) => {
     const s = await ltGetSegments(id, 'proofreader', { limit: size, offset: (page - 1) * size })
     setSegments(s.segments)
     setTotal(s.total)
+    setTotalMustFix(s.total_must_fix)
+    setMustFixIndices(s.must_fix_indices)
+    setAllFlags(s.all_flags)
     setDirtyIndices(new Set())
   }, [id])
 
@@ -86,6 +93,7 @@ export default function LtProofreadPage() {
 
   const handleSearchChange = (q: string) => {
     setSearchQuery(q)
+    setShowQaResult(false)
     if (q) {
       ltGetSegments(id, 'proofreader', { limit: 200, offset: 0, q, search_all: true }).then(s => {
         setSearchResults(s.segments.map(seg => ({ index: seg.index, source: seg.source })))
@@ -97,7 +105,38 @@ export default function LtProofreadPage() {
     }
   }
 
+  const navigateToMustFix = async (direction: 'prev' | 'next') => {
+    if (mustFixIndices.length === 0) return
+    const firstVisible = (currentPage - 1) * pageSize
+    const lastVisible  = firstVisible + segments.length - 1
+
+    let target: number | null = null
+    if (direction === 'next') {
+      target = mustFixIndices.find(i => i > lastVisible) ?? null
+    } else {
+      const rev = [...mustFixIndices].reverse()
+      target = rev.find(i => i < firstVisible) ?? null
+    }
+    if (target === null) return
+
+    const targetPage = Math.floor(target / pageSize) + 1
+    await handlePageChange(targetPage)
+  }
+
+  const jumpToSegment = async (paragraphIndex: number) => {
+    const targetPage = Math.floor(paragraphIndex / pageSize) + 1
+    setShowQaResult(false)
+    await handlePageChange(targetPage)
+    setHighlightedIndex(paragraphIndex)
+    setTimeout(() => setHighlightedIndex(null), 2600)
+    setTimeout(() => {
+      const el = document.getElementById(`segment-${paragraphIndex}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+  }
+
   const handleSelectResult = async (paragraphIndex: number) => {
+    setShowQaResult(false)
     const targetPage = Math.floor(paragraphIndex / pageSize) + 1
     if (targetPage !== currentPage) {
       await handlePageChange(targetPage)
@@ -233,6 +272,12 @@ export default function LtProofreadPage() {
               第 {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} 段，共 {total} 個段落
               <span className="w-1 h-1 rounded-full bg-white/20" />
               {order.word_count?.toLocaleString()} 字
+              {totalMustFix > 0 && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-white/20" />
+                  <span className="text-coral font-bold">{totalMustFix} 個待修正</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -242,6 +287,10 @@ export default function LtProofreadPage() {
           <button onClick={() => setShowOriginal(true)}
             className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             原始內容
+          </button>
+          <button onClick={() => setShowQaResult(true)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${totalMustFix > 0 ? 'bg-coral/10 border-coral/30 text-coral' : 'border-white/10 text-mist hover:text-paper hover:bg-white/5'}`}>
+            QA 結果{totalMustFix > 0 && ` (${totalMustFix})`}
           </button>
           <button onClick={async () => {
             try {
@@ -310,22 +359,46 @@ export default function LtProofreadPage() {
         </div>
       )}
 
+      {/* Must-fix Navigation */}
+      {totalMustFix > 0 && (
+        <div className="mx-6 mt-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-coral/10 border border-coral/20">
+          <span className="text-sm font-bold text-coral">{totalMustFix} 個待修正段落</span>
+          <span className="text-xs text-mist">
+            （第 {mustFixIndices.map(i => Math.floor(i / pageSize) + 1).filter((v, k, a) => a.indexOf(v) === k).join('、')} 頁）
+          </span>
+          <div className="flex-1" />
+          <button onClick={() => navigateToMustFix('prev')}
+            className="px-3 py-1.5 rounded-lg border border-coral/30 text-xs font-medium text-coral hover:bg-coral/10 transition-all">
+            上一處修正
+          </button>
+          <button onClick={() => navigateToMustFix('next')}
+            className="px-3 py-1.5 rounded-lg bg-coral text-xs font-bold text-white hover:bg-coral-light hover:scale-105 transition-all">
+            下一處修正
+          </button>
+        </div>
+      )}
+
       {/* Proofreader Content */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto p-6 space-y-4">
           <div className="sticky top-0 z-10 bg-night/90 backdrop-blur-sm rounded-xl pb-3 mb-2">
             <SearchBar value={searchQuery} onChange={handleSearchChange} onSelectResult={handleSelectResult} results={searchResults} totalMatches={searchQuery ? crossPageTotal : undefined} theme="amber" />
           </div>
-          {segments.map((seg) => (
+          {segments.map((seg) => {
+            const unresolvedFlags = (seg.flags || []).filter(f => !f.resolved)
+            const hasMustFix = unresolvedFlags.some(f => f.flag_level === 'must_fix')
+            const isUntranslated = unresolvedFlags.some(f => f.flag_type === 'untranslated')
+
+            return (
             <div id={`segment-${seg.index}`} key={seg.index} className="group grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{
               transition: 'box-shadow 2.5s ease-out, background 2.5s ease-out',
               ...(seg.index === highlightedIndex ? { boxShadow: 'inset 0 0 0 2px rgba(184,133,42,0.5), 0 0 20px rgba(184,133,42,0.2)', background: 'rgba(184,133,42,0.05)', borderRadius: '0.75rem' } : {}),
             }}>
               {/* Left: Source + NMT */}
-              <div className="space-y-2">
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="text-[10px] font-mono text-mist/30 select-none flex items-center gap-2 mb-2">
-                    <span>#{seg.index + 1}</span>
+              <div className={`space-y-2`}>
+                <div className={`rounded-xl border p-4 transition-colors ${isUntranslated ? 'border-coral/40 bg-coral/[0.04]' : 'border-white/5 bg-white/[0.02]'}`}>
+                  <div className="text-[10px] font-mono select-none flex items-center gap-2 mb-2">
+                    <span className={isUntranslated ? 'text-coral/70' : 'text-mist/30'}>#{seg.index + 1}</span>
                     <span className="text-mist/20">原文</span>
                   </div>
                   <div className="text-sm text-mist leading-relaxed whitespace-pre-wrap">{seg.source}</div>
@@ -346,10 +419,22 @@ export default function LtProofreadPage() {
               </div>
               {/* Right: Editor's translation + Editor comments + Proofreader comments */}
               <div className="space-y-2">
-                <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] p-4">
+                <div className={`rounded-xl border p-4 transition-colors ${isUntranslated ? 'border-coral/30 bg-coral/[0.03]' : 'border-emerald-500/10 bg-emerald-500/[0.03]'}`}>
                   <div className="text-[10px] font-mono text-mist/30 mb-2">編輯譯文</div>
                   <div className="text-sm text-paper leading-relaxed whitespace-pre-wrap">{seg.translated}</div>
                 </div>
+
+                {/* QA Flag indicators */}
+                {unresolvedFlags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {unresolvedFlags.map((flag) => (
+                      <span key={flag.id} className={`text-[12px] font-medium px-2 py-0.5 rounded-full ${flag.flag_level === 'must_fix' ? 'bg-coral/10 text-coral border border-coral/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                        {flag.flag_type === 'untranslated' ? '未翻譯' : flag.flag_type === 'missing_translation' ? '漏譯' : flag.flag_type === 'segment_count_mismatch' ? '段落數不符' : flag.flag_type === 'number_inconsistency' ? '數字不一致' : flag.flag_type}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {seg.editor_comments && (
                   <div className="rounded-xl border border-blue-500/10 bg-blue-500/[0.03] p-3">
                     <div className="text-[10px] font-mono text-mist/30 mb-1">編輯備註</div>
@@ -359,12 +444,13 @@ export default function LtProofreadPage() {
                 <AutoResizeTextarea
                   value={seg.proofreader_comments || ''}
                   onChange={e => handleCommentChange(seg.index, e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300 leading-relaxed resize-none focus:outline-none focus:border-amber-500/50 placeholder-amber-500/30 no-scrollbar"
-                  placeholder="校對意見..."
+                  className={`w-full px-3 py-2 rounded-lg border text-xs leading-relaxed resize-none focus:outline-none no-scrollbar transition-all ${hasMustFix ? 'bg-coral/5 border-coral/30 focus:border-coral/50 placeholder-coral/30 text-coral-300' : 'bg-amber-500/5 border-amber-500/20 text-amber-300 focus:border-amber-500/50 placeholder-amber-500/30'}`}
+                  placeholder={hasMustFix ? '請填寫修正說明（必填）' : '校對意見...'}
                 />
               </div>
             </div>
-          ))}
+            )
+          })}
 
           {/* Pagination */}
           <Pagination
@@ -377,6 +463,88 @@ export default function LtProofreadPage() {
           />
         </div>
       </div>
+
+      {/* QA Result Drawer */}
+      {showQaResult && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowQaResult(false)} />
+          <div className="relative w-full max-w-lg bg-[#111122] border-l-2 border-coral/40 shadow-2xl shadow-coral/5 overflow-auto">
+            <div className="sticky top-0 bg-[#111122]/95 backdrop-blur-md border-b border-coral/20 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 rounded bg-coral" />
+                <h2 className="text-lg font-bold text-white">QA 結果</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-white/50">{allFlags.length} 個標記</span>
+                <button onClick={() => setShowQaResult(false)}
+                  className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-3">
+              {allFlags.length === 0 && (
+                <p className="text-sm text-white/40 text-center py-8">無 QA 標記</p>
+              )}
+              {allFlags
+                .slice()
+                .sort((a, b) => {
+                  if (a.flag_level !== b.flag_level) return a.flag_level === 'must_fix' ? -1 : 1
+                  return a.paragraph_index - b.paragraph_index
+                })
+                .map((flag) => {
+                  const flagLabel =
+                    flag.flag_type === 'missing_segment' ? '漏譯' :
+                    flag.flag_type === 'untranslated' ? '未翻譯' :
+                    flag.flag_type === 'partial_untranslated' ? '部分未翻譯' :
+                    flag.flag_type === 'missing_translation' ? '漏譯' :
+                    flag.flag_type === 'segment_count_mismatch' ? '段落數不符' :
+                    flag.flag_type === 'number_inconsistency' ? '數字不一致' :
+                    flag.flag_type === 'length_ratio' ? '長度比例異常' :
+                    flag.flag_type === 'semantic_drift' ? '語意漂移' :
+                    flag.flag_type === 'terminology_mismatch' ? '術語不一致' :
+                    flag.flag_type === 'readability_low' ? '可讀性低' : flag.flag_type;
+                  return (
+                    <div key={flag.id} className={`rounded-xl border-2 p-4 transition-colors ${
+                      flag.resolved
+                        ? 'border-green-500/30 bg-green-500/10'
+                        : flag.flag_level === 'must_fix'
+                        ? 'border-coral/40 bg-coral/10 shadow-[0_0_12px_rgba(255,107,107,0.08)]'
+                        : 'border-amber-500/30 bg-amber-500/10'
+                    }`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono text-white/60 bg-white/5 px-1.5 py-0.5 rounded">#{flag.paragraph_index + 1}</span>
+                          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                            flag.flag_level === 'must_fix' ? 'bg-coral text-white' : 'bg-amber-400 text-black'
+                          }`}>{flagLabel}</span>
+                          <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
+                            flag.resolved ? 'bg-green-500/20 text-green-300' : 'bg-white/10 text-white/60'
+                          }`}>
+                            {flag.resolved ? '已處理' : flag.flag_level === 'must_fix' ? '待修正' : '待審閱'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => jumpToSegment(flag.paragraph_index)}
+                          className="shrink-0 px-3 py-1 rounded-lg border border-coral/30 text-[11px] font-bold text-coral hover:bg-coral/20 hover:border-coral/60 transition-all">
+                          跳至段落
+                        </button>
+                      </div>
+                      {flag.source_segment && (
+                        <p className="mt-2 text-xs text-white/50 line-clamp-2">{flag.source_segment}</p>
+                      )}
+                      {flag.translated_segment && (
+                        <p className="mt-1 text-xs text-white/30 line-clamp-2">{flag.translated_segment}</p>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Sample Package Modal ── */}
       {showPackage && (

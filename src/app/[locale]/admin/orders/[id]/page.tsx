@@ -4,12 +4,14 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetOrder, adminGetDownloadUrl, adminGetBilingualDownloadUrl, adminGetPlainTextDownloadUrl,
+  adminGetPipelineProgress,
   adminGetOriginalContent, adminGetTokenUsage, adminGetTokenUsageDetail,
   confirmPayment, markDelivered, adminListQaFlags,
   adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminUpdateQuote,
   adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
   adminListSupportFiles, adminGetSupportFileContent,
   Order, QAFlag, QAResult, UserAccount, SupportFile,
+  PipelineProgress,
   TokenUsageItem, TokenUsageResponse, TokenUsageDetailItem
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
@@ -20,6 +22,46 @@ import dayjs from 'dayjs'
 function ScoreBadge({ score }: { score: number }) {
   const cls = score >= 75 ? 'text-green-400' : score >= 55 ? 'text-amber-400' : 'text-coral'
   return <span className={`font-bold ${cls}`}>{score.toFixed(1)}</span>
+}
+
+function PipelineProgressBar({ progress }: { progress: PipelineProgress }) {
+  const pct = progress.total_batches > 0
+    ? Math.round((progress.completed_batches / progress.total_batches) * 100)
+    : 0
+
+  if (progress.status === 'no_batches') {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <h2 className="text-sm font-semibold text-mist">管線進度</h2>
+        <p className="text-sm text-mist mt-1 italic">尚無批次資訊</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-gold/20 bg-white/5 p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gold">翻譯進度</h2>
+        <span className="text-xs text-mist font-mono">
+          {progress.completed_batches}/{progress.total_batches} 批次
+          {progress.total_segments > 0 && ` · ${progress.completed_segments}/${progress.total_segments} 段落`}
+        </span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${
+            progress.status === 'complete' ? 'bg-green-400' : 'bg-gold'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-mist">
+        {progress.status === 'complete'
+          ? '✓ 所有批次已完成'
+          : `${pct}% 已完成 (${progress.total_batches - progress.completed_batches} 批進行中)`}
+      </p>
+    </div>
+  )
 }
 
 function QAScorePanel({ qa }: { qa: QAResult }) {
@@ -91,6 +133,7 @@ export default function AdminOrderDetailPage() {
   const [supportFiles, setSupportFiles] = useState<SupportFile[]>([])
   const [showSupportFiles, setShowSupportFiles] = useState(false)
   const [viewingSupportFile, setViewingSupportFile] = useState<{ orderId: string; fileId: string } | null>(null)
+  const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress | null>(null)
 
   async function handleUpdateStatus(newStatus: string) {
     if (!confirm(`確定將訂單狀態改為 ${newStatus}？`)) return
@@ -161,6 +204,7 @@ export default function AdminOrderDetailPage() {
 
     adminGetTokenUsage(id).then(r => setTokenUsage(r)).catch(e => console.warn('token-usage fetch failed:', e))
     adminListSupportFiles(id).then(r => setSupportFiles(r.files)).catch(() => {})
+    adminGetPipelineProgress(id).then(r => setPipelineProgress(r)).catch(() => {})
 
     // 獨立獲取符合該訂單語言要求的 Editor / QA 列表用於指派
     adminListEligibleUsers(id).then(d => {
@@ -170,6 +214,20 @@ export default function AdminOrderDetailPage() {
     }).catch(() => {})
   }, [id, tick])
 
+  // ── Poll pipeline progress every 10s until complete ──
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const prog = await adminGetPipelineProgress(id)
+        setPipelineProgress(prog)
+        if (prog.status === 'complete') {
+          clearInterval(interval)
+        }
+      } catch { /* transient errors are fine */ }
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [id])
 
   async function handleAssign(editorId?: string, qaId?: string) {
     setAssigning(true)
@@ -375,6 +433,9 @@ export default function AdminOrderDetailPage() {
           <StatusBadge status={order.status} />
         </div>
       </div>
+
+      {/* Pipeline Progress */}
+      {pipelineProgress && <PipelineProgressBar progress={pipelineProgress} />}
 
       {/* QA Review Action (Fast Track only — LT uses editor/proofreader workflow) */}
       {order.track_type !== 'literary' && (
