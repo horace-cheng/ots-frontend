@@ -7,7 +7,7 @@ import {
   adminGetPipelineProgress,
   adminGetOriginalContent, adminGetTokenUsage, adminGetTokenUsageDetail,
   confirmPayment, markDelivered, adminListQaFlags,
-  adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminUpdateQuote,
+  adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminRedeliver, adminUpdateQuote,
   adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
   adminListSupportFiles, adminGetSupportFileContent,
   Order, QAFlag, QAResult, UserAccount, SupportFile,
@@ -146,10 +146,24 @@ export default function AdminOrderDetailPage() {
   }
 
   async function handleRetranslate() {
-    if (!confirm('確定重新觸發翻譯？這將清除現有譯文並從頭開始翻譯流程。')) return
+    const msg = order?.status === 'delivered'
+      ? '此訂單已交付給客戶。重新翻譯將清除現有譯文、覆蓋已交付的輸出檔案，並重新開始翻譯流程。確定繼續？'
+      : '確定重新觸發翻譯？這將清除現有譯文並從頭開始翻譯流程。'
+    if (!confirm(msg)) return
     try {
       await adminRetranslate(id)
       alert('翻譯流程已重新觸發')
+      setTick(t => t + 1)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function handleRedeliver() {
+    if (!confirm('僅重新生成交付檔案（不重新翻譯）。確定繼續？')) return
+    try {
+      await adminRedeliver(id)
+      alert('已開始重新生成，系統需要幾分鐘產生新檔案')
       setTick(t => t + 1)
     } catch (e: any) {
       alert(e.message)
@@ -191,20 +205,13 @@ export default function AdminOrderDetailPage() {
       setOrder(o)
       setGcsPath(o.gcs_output_path ?? '')
       setQaFlags(flags.flags)
-      if (o.gcs_output_path) {
-        adminGetDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
-      }
-      if (o.gcs_bilingual_output_path) {
-        adminGetBilingualDownloadUrl(id).then(r => setBilingualDownloadUrl(r.signed_url)).catch(() => {})
-      }
-      if (o.gcs_plain_text_output_path) {
-        adminGetPlainTextDownloadUrl(id).then(r => setPlainTextDownloadUrl(r.signed_url)).catch(() => {})
-      }
+      adminGetDownloadUrl(id).then(r => setDownloadUrl(r.signed_url)).catch(() => {})
+      adminGetBilingualDownloadUrl(id).then(r => setBilingualDownloadUrl(r.signed_url)).catch(() => {})
+      adminGetPlainTextDownloadUrl(id).then(r => setPlainTextDownloadUrl(r.signed_url)).catch(() => {})
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
 
     adminGetTokenUsage(id).then(r => setTokenUsage(r)).catch(e => console.warn('token-usage fetch failed:', e))
     adminListSupportFiles(id).then(r => setSupportFiles(r.files)).catch(() => {})
-    adminGetPipelineProgress(id).then(r => setPipelineProgress(r)).catch(() => {})
 
     // 獨立獲取符合該訂單語言要求的 Editor / QA 列表用於指派
     adminListEligibleUsers(id).then(d => {
@@ -214,8 +221,9 @@ export default function AdminOrderDetailPage() {
     }).catch(() => {})
   }, [id, tick])
 
-  // ── Poll pipeline progress every 10s until complete ──
+  // ── Poll pipeline progress every 10s until complete (literary only) ──
   useEffect(() => {
+    if (order?.track_type !== 'literary') return
     const interval = setInterval(async () => {
       try {
         const prog = await adminGetPipelineProgress(id)
@@ -227,7 +235,7 @@ export default function AdminOrderDetailPage() {
     }, 10000)
 
     return () => clearInterval(interval)
-  }, [id])
+  }, [id, order?.track_type])
 
   async function handleAssign(editorId?: string, qaId?: string) {
     setAssigning(true)
@@ -435,7 +443,7 @@ export default function AdminOrderDetailPage() {
       </div>
 
       {/* Pipeline Progress */}
-      {pipelineProgress && <PipelineProgressBar progress={pipelineProgress} />}
+      {order.track_type === 'literary' && pipelineProgress && <PipelineProgressBar progress={pipelineProgress} />}
 
       {/* QA Review Action (Fast Track only — LT uses editor/proofreader workflow) */}
       {order.track_type !== 'literary' && (
@@ -452,7 +460,7 @@ export default function AdminOrderDetailPage() {
             重啟 QA 審閱 (由已交付改回)
           </button>
         )}
-        {['qa_review', 'delivered', 'nmt_failed', 'qa_failed'].includes(order.status) && (
+        {['paid', 'processing', 'qa_review', 'delivered', 'nmt_failed', 'qa_failed'].includes(order.status) && (
           <button onClick={handleRetranslate}
             className="flex-1 px-4 py-3 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 text-sm hover:bg-amber-400/20 transition-all">
             重新翻譯
@@ -524,6 +532,20 @@ export default function AdminOrderDetailPage() {
               </a>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Redeliver (regenerate output files without re-translating) */}
+      {['delivered', 'qa_review'].includes(order.status) && (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-center justify-between mb-4">
+          <div>
+            <p className="text-base font-semibold text-mist">重新生成譯文</p>
+            <p className="text-sm text-mist mt-0.5">使用既有譯文重新產出檔案（更新字體、樣式等，不重新翻譯）</p>
+          </div>
+          <button onClick={handleRedeliver}
+            className="px-4 py-2 rounded-md bg-amber-400/10 text-amber-400 text-sm font-medium border border-amber-400/30 hover:bg-amber-400/20 transition-colors whitespace-nowrap">
+            重新生成
+          </button>
         </div>
       )}
 

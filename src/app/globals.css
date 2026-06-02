@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Iansui:wght@400;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -21,13 +22,13 @@ html { scroll-behavior: smooth; font-size: 20px; }
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: 'Noto Sans TC', system-ui, sans-serif;
+  font-family: 'Iansui', var(--font-body), 'Noto Sans TC', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
 /* ── Typography ─────────────────────────────────────────────────────────────── */
-.font-display { font-family: 'Noto Serif TC', Georgia, serif; }
+.font-display { font-family: var(--font-display), 'Iansui', 'Noto Sans TC', 'Noto Serif TC', Georgia, serif; }
 
 /* ── Layout ─────────────────────────────────────────────────────────────────── */
 .page-container {

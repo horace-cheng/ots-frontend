@@ -247,6 +247,9 @@ export const adminUpdateOrderStatus = (id: string, status: string) =>
 export const adminRetranslate = (id: string) =>
   request<{ message: string }>('POST', `/admin/orders/${id}/retranslate`)
 
+export const adminRedeliver = (id: string) =>
+  request<{ message: string }>('POST', `/admin/orders/${id}/redeliver`)
+
 export const adminAssignEditor = (order_id: string, data: { editor_id: string | null; qa_id: string | null }) =>
   request<MessageResponse>('PATCH', `/admin/orders/${order_id}/assign-editor`, data)
 

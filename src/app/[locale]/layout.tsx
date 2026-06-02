@@ -12,7 +12,7 @@ const display = Noto_Serif_TC({
 })
 
 const body = Noto_Sans_TC({
-  subsets:  ['latin'],
+  subsets:  ['latin', 'latin-ext'],
   weight:   ['400', '500'],
   variable: '--font-body',
 })
