@@ -13,6 +13,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { AutoResizeTextarea } from '@/components/auto-resize-textarea'
 import { SearchBar } from '@/components/search-bar'
 import OriginalContentViewer from '@/components/original-content-viewer'
+import VersionHistoryPanel from '@/components/version-history-panel'
 
 export default function LtEditPage() {
   const { id } = useParams<{ id: string }>()
@@ -39,10 +40,12 @@ export default function LtEditPage() {
   const [dirtyIndices,   setDirtyIndices]   = useState<Set<number>>(new Set())
   const [totalMustFix,   setTotalMustFix]   = useState(0)
   const [mustFixIndices, setMustFixIndices] = useState<number[]>([])
+  const [currentMustFixIdx, setCurrentMustFixIdx] = useState(-1)
   const [allFlags,       setAllFlags]       = useState<QAFlag[]>([])
   const [searchQuery,    setSearchQuery]    = useState('')
 
   const [showQaResult,   setShowQaResult]   = useState(false)
+  const [showVersions,   setShowVersions]   = useState(false)
   const [searchResults, setSearchResults] = useState<{ index: number; source: string }[]>([])
   const [crossPageTotal, setCrossPageTotal] = useState(0)
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null)
@@ -204,20 +207,26 @@ export default function LtEditPage() {
 
   const navigateToMustFix = async (direction: 'prev' | 'next') => {
     if (mustFixIndices.length === 0) return
-    const firstVisible = (currentPage - 1) * pageSize
-    const lastVisible  = firstVisible + segments.length - 1
 
-    let target: number | null = null
-    if (direction === 'next') {
-      target = mustFixIndices.find(i => i > lastVisible) ?? null
-    } else {
-      const rev = [...mustFixIndices].reverse()
-      target = rev.find(i => i < firstVisible) ?? null
-    }
-    if (target === null) return
+    const newIdx = direction === 'next'
+      ? Math.min(currentMustFixIdx + 1, mustFixIndices.length - 1)
+      : Math.max(currentMustFixIdx - 1, 0)
+    if (newIdx === currentMustFixIdx) return
+
+    const target = mustFixIndices[newIdx]
+    setCurrentMustFixIdx(newIdx)
 
     const targetPage = Math.floor(target / pageSize) + 1
-    await handlePageChange(targetPage)
+    if (targetPage !== currentPage) {
+      await handlePageChange(targetPage)
+    }
+    setShowQaResult(false)
+    setHighlightedIndex(target)
+    setTimeout(() => setHighlightedIndex(null), 2600)
+    setTimeout(() => {
+      const el = document.getElementById(`segment-${target}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
   }
 
   if (busy) return (
@@ -229,7 +238,7 @@ export default function LtEditPage() {
   if (!order) return null
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] -m-6 bg-night">
+    <div className="flex flex-col h-[calc(100vh-64px)] -m-6 bg-night">
       {/* Sticky Header */}
       <div className="z-20 bg-night/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -263,6 +272,10 @@ export default function LtEditPage() {
 
         <div className="flex items-center gap-3">
           <StatusBadge status={order.status} />
+          <button onClick={() => setShowVersions(true)}
+            className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
+            版本歷史
+          </button>
           <button onClick={() => setShowOriginal(true)}
             className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-mist hover:text-paper hover:bg-white/5 transition-all">
             原始內容
@@ -317,9 +330,21 @@ export default function LtEditPage() {
       {/* Must-fix Navigation */}
       {totalMustFix > 0 && (
         <div className="mx-6 mt-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-coral/10 border border-coral/20">
-          <span className="text-sm font-bold text-coral">{totalMustFix} 個待修正段落</span>
+          <span
+            className={`text-sm font-bold transition-colors ${
+              mustFixIndices.some(i => Math.floor(i / pageSize) + 1 === currentPage)
+                ? 'text-amber-300'
+                : 'text-coral'
+            }`}
+          >
+            {totalMustFix} 個待修
+          </span>
           <span className="text-xs text-mist">
-            （第 {mustFixIndices.map(i => Math.floor(i / pageSize) + 1).filter((v, k, a) => a.indexOf(v) === k).join('、')} 頁）
+            （第 {mustFixIndices.map(i => Math.floor(i / pageSize) + 1).filter((v, k, a) => a.indexOf(v) === k).map((page, idx, arr) => (
+              <span key={page} className={page === currentPage ? 'text-amber-300 font-semibold' : ''}>
+                {page}{idx < arr.length - 1 ? '、' : ''}
+              </span>
+            ))} 頁）
           </span>
           <div className="flex-1" />
           <button onClick={() => navigateToMustFix('prev')}
@@ -413,8 +438,11 @@ export default function LtEditPage() {
               </div>
             )
           })}
+        </div>
+      </div>
 
-          {/* Pagination */}
+      <div className="shrink-0 border-t border-x border-white/10 bg-night/80 backdrop-blur-md px-6">
+        <div className="max-w-[1400px] mx-auto">
           <Pagination
             total={total}
             pageSize={pageSize}
@@ -431,6 +459,30 @@ export default function LtEditPage() {
         onClose={() => setShowOriginal(false)}
         fetchContent={() => ltGetOriginalContent(id)}
       />
+
+      {/* Version History Drawer */}
+      {showVersions && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowVersions(false)} />
+          <div className="relative w-full max-w-md bg-[#111122] border-l-2 border-gold/40 shadow-2xl shadow-gold/5 overflow-auto">
+            <div className="sticky top-0 bg-[#111122]/95 backdrop-blur-md border-b border-gold/20 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 rounded bg-gold" />
+                <h2 className="text-lg font-bold text-white">版本歷史</h2>
+              </div>
+              <button onClick={() => setShowVersions(false)}
+                className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <VersionHistoryPanel orderId={id} mode="editor" compact={false} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QA Result Drawer */}
       {showQaResult && (

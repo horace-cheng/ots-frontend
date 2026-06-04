@@ -119,7 +119,7 @@ export default function QaReviewEditor({
   const hoverText = accent === 'gold' ? 'hover:text-gold' : 'hover:text-purple-400'
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] -m-6 bg-night">
+    <div className="flex flex-col h-[calc(100vh-64px)] -m-6 bg-night">
       {/* Sticky Header */}
       <div className="z-20 bg-night/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -242,98 +242,101 @@ export default function QaReviewEditor({
                     <p className="text-sm text-paper/80">{seg.editor_comments}</p>
                   </div>
                 )}
-              </div>
-
-              {/* Right: Translation */}
-              <div className="flex flex-col gap-2">
-                <div className={`relative rounded-xl border p-4 transition-all ${accentBorder} ${
-                  seg.flags.some(f => f.flag_level === 'must_fix') 
-                    ? 'border-coral/30 bg-coral/5 focus-within:border-coral' 
-                    : `border-white/10 bg-white/5 ${accentFlagBorder}`
-                }`}>
-                  <AutoResizeTextarea
-                    value={seg.translated}
-                    onChange={(e) => handleSegmentChange(seg.index, 'translated', e.target.value)}
-                    readOnly={isReadOnly}
-                    placeholder="輸入譯文..."
-                    className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30 no-scrollbar"
-                  />
-                  
-                  {/* QA Flags Overlay */}
-                  {seg.flags.length > 0 && (
-                    <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
-                      {seg.flags.map(f => {
-                        const flagLabel =
-                          f.flag_type === 'missing_segment' ? '漏譯' :
-                          f.flag_type === 'untranslated' ? '未翻譯' :
-                          f.flag_type === 'partial_untranslated' ? '部分未翻譯' :
-                          f.flag_type === 'missing_translation' ? '漏譯' :
-                          f.flag_type === 'segment_count_mismatch' ? '段落數不符' :
-                          f.flag_type === 'number_inconsistency' ? '數字不一致' :
-                          f.flag_type === 'length_ratio' ? '長度比例異常' :
-                          f.flag_type === 'semantic_drift' ? '語意漂移' :
-                          f.flag_type === 'terminology_mismatch' ? '術語不一致' :
-                          f.flag_type === 'readability_low' ? '可讀性低' :
-                          f.flag_type;
-                        return (
-                        <div key={f.id} className="flex items-start gap-2 text-xs">
-                          <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter ${
-                            f.flag_level === 'must_fix' ? 'bg-coral text-white' : 'bg-amber-400 text-night'
-                          }`}>
-                            {flagLabel}
-                          </span>
-                          <span className="text-mist">{f.flag_level === 'must_fix' ? '必須修正' : '建議審閱'}</span>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Raw LLM Reference */}
-                  {seg.raw && seg.raw !== seg.translated && (
-                    <details className="mt-3 group/raw">
-                      <summary className={`text-[10px] text-mist/50 ${hoverText} cursor-pointer list-none flex items-center gap-1 transition-colors`}>
-                        <svg className="w-3 h-3 group-open/raw:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        查看原始譯文 (LLM Raw)
-                      </summary>
-                      <div className="mt-2 text-[11px] text-mist/40 italic bg-white/[0.02] p-2 rounded border border-dashed border-white/5">
-                        {seg.raw}
-                      </div>
-                    </details>
-                  )}
                 </div>
 
-                {/* Segment Comments */}
-                <AutoResizeTextarea
-                  value={seg.comments || ''}
-                  onChange={(e) => handleSegmentChange(seg.index, 'comments', e.target.value)}
-                  readOnly={isReadOnly}
-                  placeholder={seg.flags.length > 0 ? "添加審閱備註（必填）" : "添加備註（選填）"}
-                  className={`px-3 py-2 rounded-lg bg-white/5 border text-xs transition-all placeholder:text-mist/20 resize-none no-scrollbar ${
-                    seg.flags.length > 0 && !seg.comments?.trim() 
-                      ? 'border-coral/40 focus:border-coral focus:ring-1 focus:ring-coral/20' 
-                      : 'border-white/5 focus:text-paper focus:border-gold/30 focus:outline-none'
-                  }`}
-                />
-              </div>
-            </div>
-          ))}
+                {/* Right: Translation */}
+                <div className="flex flex-col gap-2">
+                  <div className={`relative rounded-xl border p-4 transition-all ${accentBorder} ${
+                    seg.flags.some(f => f.flag_level === 'must_fix') 
+                      ? 'border-coral/30 bg-coral/5 focus-within:border-coral' 
+                      : `border-white/10 bg-white/5 ${accentFlagBorder}`
+                  }`}>
+                    <AutoResizeTextarea
+                      value={seg.translated}
+                      onChange={(e) => handleSegmentChange(seg.index, 'translated', e.target.value)}
+                      readOnly={isReadOnly}
+                      placeholder="輸入譯文..."
+                      className="w-full bg-transparent text-sm text-paper leading-relaxed resize-none focus:outline-none placeholder:text-mist/30 no-scrollbar"
+                    />
+                    
+                    {/* QA Flags Overlay */}
+                    {seg.flags.length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                        {seg.flags.map(f => {
+                          const flagLabel =
+                            f.flag_type === 'missing_segment' ? '漏譯' :
+                            f.flag_type === 'untranslated' ? '未翻譯' :
+                            f.flag_type === 'partial_untranslated' ? '部分未翻譯' :
+                            f.flag_type === 'missing_translation' ? '漏譯' :
+                            f.flag_type === 'segment_count_mismatch' ? '段落數不符' :
+                            f.flag_type === 'number_inconsistency' ? '數字不一致' :
+                            f.flag_type === 'length_ratio' ? '長度比例異常' :
+                            f.flag_type === 'semantic_drift' ? '語意漂移' :
+                            f.flag_type === 'terminology_mismatch' ? '術語不一致' :
+                            f.flag_type === 'readability_low' ? '可讀性低' :
+                            f.flag_type;
+                          return (
+                          <div key={f.id} className="flex items-start gap-2 text-xs">
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter ${
+                              f.flag_level === 'must_fix' ? 'bg-coral text-white' : 'bg-amber-400 text-night'
+                            }`}>
+                              {flagLabel}
+                            </span>
+                            <span className="text-mist">{f.flag_level === 'must_fix' ? '必須修正' : '建議審閱'}</span>
+                          </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-          {/* Pagination */}
-          {total != null && total > 0 && onPageChange && (
-            <Pagination
-              total={total}
-              pageSize={pageSize}
-              currentPage={currentPage}
-              onPageChange={onPageChange}
-              onPageSizeChange={onPageSizeChange}
-              theme="dark"
-            />
-          )}
+                    {/* Raw LLM Reference */}
+                    {seg.raw && seg.raw !== seg.translated && (
+                      <details className="mt-3 group/raw">
+                        <summary className={`text-[10px] text-mist/50 ${hoverText} cursor-pointer list-none flex items-center gap-1 transition-colors`}>
+                          <svg className="w-3 h-3 group-open/raw:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          查看原始譯文 (LLM Raw)
+                        </summary>
+                        <div className="mt-2 text-[11px] text-mist/40 italic bg-white/[0.02] p-2 rounded border border-dashed border-white/5">
+                          {seg.raw}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+
+                  {/* Segment Comments */}
+                  <AutoResizeTextarea
+                    value={seg.comments || ''}
+                    onChange={(e) => handleSegmentChange(seg.index, 'comments', e.target.value)}
+                    readOnly={isReadOnly}
+                    placeholder={seg.flags.length > 0 ? "添加審閱備註（必填）" : "添加備註（選填）"}
+                    className={`px-3 py-2 rounded-lg bg-white/5 border text-xs transition-all placeholder:text-mist/20 resize-none no-scrollbar ${
+                      seg.flags.length > 0 && !seg.comments?.trim() 
+                        ? 'border-coral/40 focus:border-coral focus:ring-1 focus:ring-coral/20' 
+                        : 'border-white/5 focus:text-paper focus:border-gold/30 focus:outline-none'
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+
+        {total != null && total > 0 && onPageChange && (
+          <div className="shrink-0 border-t border-x border-white/10 bg-night/80 backdrop-blur-md px-6">
+            <div className="max-w-[1400px] mx-auto">
+              <Pagination
+                total={total}
+                pageSize={pageSize}
+                currentPage={currentPage}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+                theme="dark"
+              />
+            </div>
+          </div>
+        )}
 
       {/* QA Result Drawer */}
       {showQaResult && (

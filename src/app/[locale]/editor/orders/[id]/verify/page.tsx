@@ -195,7 +195,7 @@ export default function EditorVerifyPage() {
   )
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] -m-6 bg-night">
+    <div className="flex flex-col h-[calc(100vh-64px)] -m-6 bg-night">
       {/* Sticky Header */}
       <div className="z-20 bg-night/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -335,8 +335,11 @@ export default function EditorVerifyPage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
 
-          {/* Pagination */}
+      <div className="shrink-0 border-t border-x border-white/10 bg-night/80 backdrop-blur-md px-6">
+        <div className="max-w-[1400px] mx-auto">
           <Pagination
             total={total}
             pageSize={pageSize}

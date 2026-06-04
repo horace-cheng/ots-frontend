@@ -3,7 +3,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   adminGetOrder, adminGetSegments, adminGetOriginalContent, adminUpdateSegments, adminMarkQaDone,
-  Order, QASegment,
+  adminListVersions,
+  Order, QASegment, TranslationVersion,
 } from '@/lib/api'
 import QaReviewEditor from '@/components/qa-review-editor'
 import OriginalContentViewer from '@/components/original-content-viewer'
@@ -17,6 +18,7 @@ export default function QaReviewEditorPage() {
   const [busy,     setBusy]     = useState(true)
   const [error,    setError]    = useState('')
   const [showOriginal, setShowOriginal] = useState(false)
+  const [versions, setVersions] = useState<TranslationVersion[]>([])
 
   // Pagination state
   const [total,       setTotal]       = useState(0)
@@ -40,8 +42,10 @@ export default function QaReviewEditorPage() {
     Promise.all([
       adminGetOrder(id),
       fetchSegments(1, pageSize),
-    ]).then(([o]) => {
+      adminListVersions(id).catch(() => []),
+    ]).then(([o, _, vers]) => {
       setOrder(o)
+      setVersions(vers)
     }).catch(e => setError(e.message)).finally(() => setBusy(false))
   }, [id, pageSize, fetchSegments])
 
@@ -121,6 +125,12 @@ export default function QaReviewEditorPage() {
 
   return (
     <>
+      {versions.length > 0 && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-paper/50">
+          <span className="px-2 py-0.5 rounded-full bg-white/10 font-mono">v{versions[0].version}</span>
+          <span>{versions.length} 個版本</span>
+        </div>
+      )}
       <QaReviewEditor
         order={order}
         segments={segments}

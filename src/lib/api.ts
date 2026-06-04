@@ -596,3 +596,54 @@ export interface PipelineProgress {
   completed_segments: number
 }
 
+// ── Translation Versions ────────────────────────────────────────────────────
+export interface TranslationVersion {
+  id:                string
+  version:           number
+  label:             string | null
+  source:            string
+  created_at:        string
+  segment_count:     number | null
+  gcs_path:          string
+  created_by_email:  string | null
+}
+
+export interface DiffSegment {
+  index:             number
+  source:            string
+  old?:              string
+  new?:              string
+  text?:             string
+}
+
+export interface VersionDiff {
+  changed:           DiffSegment[]
+  added:             DiffSegment[]
+  removed:           DiffSegment[]
+}
+
+export const adminListVersions = (orderId: string) =>
+  request<TranslationVersion[]>('GET', `/admin/orders/${orderId}/versions`)
+
+export const adminSaveVersion = (orderId: string, label?: string) =>
+  request<TranslationVersion>('POST', `/admin/orders/${orderId}/versions?label=${label ? encodeURIComponent(label) : ''}`)
+
+export const adminRestoreVersion = (orderId: string, versionId: string) =>
+  request<TranslationVersion>('POST', `/admin/orders/${orderId}/versions/${versionId}/restore`)
+
+export const adminDiffVersions = (orderId: string, versionId: string, against?: string) => {
+  const qs = against ? `?against=${against}` : ''
+  return request<VersionDiff>('GET', `/admin/orders/${orderId}/versions/${versionId}/diff${qs}`)
+}
+
+export const ltListVersions = (orderId: string) =>
+  request<TranslationVersion[]>('GET', `/editor/lt/orders/${orderId}/versions`)
+
+export const ltDiffVersions = (orderId: string, versionId: string, against?: string) => {
+  const qs = against ? `?against=${against}` : ''
+  return request<VersionDiff>('GET', `/editor/lt/orders/${orderId}/versions/${versionId}/diff${qs}`)
+}
+
+export const adminDiffLive = (orderId: string) =>
+  request<VersionDiff>('GET', `/admin/orders/${orderId}/versions/live/diff`)
+

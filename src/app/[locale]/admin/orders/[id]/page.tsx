@@ -17,6 +17,7 @@ import {
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
 import OriginalContentViewer from '@/components/original-content-viewer'
+import VersionHistoryPanel from '@/components/version-history-panel'
 import dayjs from 'dayjs'
 
 function ScoreBadge({ score }: { score: number }) {
@@ -549,6 +550,9 @@ export default function AdminOrderDetailPage() {
         </div>
       )}
 
+      {/* Version History */}
+      <VersionHistoryPanel orderId={id} mode="admin" onRefresh={() => setTick(t => t + 1)} />
+
       {/* Token Usage */}
       {tokenUsage && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
@@ -620,7 +624,7 @@ export default function AdminOrderDetailPage() {
                   <tbody>
                     {tokenDetail.map((d, i) => (
                       <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
-                        <td className="py-1.5 pr-3 whitespace-nowrap">{dayjs(d.created_at).format('HH:mm:ss')}</td>
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{dayjs(d.created_at).format('YYYY-MM-DD HH:mm:ss')}</td>
                         <td className="py-1.5 pr-3">{d.job_type}</td>
                         <td className="py-1.5 pr-3">{d.model}</td>
                         <td className="py-1.5 pr-3 text-right">{d.prompt_tokens.toLocaleString()}</td>
