@@ -2,6 +2,29 @@ import { getIdToken } from './firebase'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || ''
 
+// ── Global API loading state (for "Waiting for response…" indicator) ──────
+type LoadingListener = (loading: boolean) => void
+const listeners = new Set<LoadingListener>()
+
+export function onApiLoading(listener: LoadingListener) {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+function notifyLoading(loading: boolean) {
+  listeners.forEach(fn => fn(loading))
+}
+
+let pending = 0
+function wrapLoading<T>(fn: () => Promise<T>): Promise<T> {
+  if (pending === 0) notifyLoading(true)
+  pending++
+  return fn().finally(() => {
+    pending--
+    if (pending === 0) notifyLoading(false)
+  })
+}
+
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -38,18 +61,20 @@ async function request<T>(
     if (qs) url += `?${qs}`
   }
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+  return wrapLoading(async () => {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new ApiError(err.detail || `HTTP ${res.status}`, res.status)
+    }
+
+    return res.json()
   })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new ApiError(err.detail || `HTTP ${res.status}`, res.status)
-  }
-
-  return res.json()
 }
 
 // ── Orders ────────────────────────────────────────────────────────────────────
@@ -250,6 +275,9 @@ export const adminRetranslate = (id: string) =>
 export const adminRedeliver = (id: string) =>
   request<{ message: string }>('POST', `/admin/orders/${id}/redeliver`)
 
+export const adminRerunStage = (id: string, stage: string) =>
+  request<{ message: string }>('POST', `/admin/orders/${id}/rerun-stage`, { stage })
+
 export const adminAssignEditor = (order_id: string, data: { editor_id: string | null; qa_id: string | null }) =>
   request<MessageResponse>('PATCH', `/admin/orders/${order_id}/assign-editor`, data)
 
@@ -331,6 +359,72 @@ export const adminCompleteLiteraryRole = (order_id: string, role: 'editor' | 'pr
 // ── Literary Track Quotation ─────────────────────────────────────────────────
 export const adminUpdateQuote = (order_id: string, data: { quoted_price: number; admin_notes?: string }) =>
   request<{ message: string }>('POST', `/admin/orders/${order_id}/quote`, data)
+
+
+// ── Gutenberg Track ──────────────────────────────────────────────────────────
+export interface GutenbergBookInfo {
+  book_id: number
+  title: string
+  authors: string[]
+  language: string
+  word_count: number
+  num_chapters: number
+  num_chunks: number
+}
+
+export const adminFetchGutenbergBook = (book_id: number) =>
+  request<GutenbergBookInfo>('GET', `/admin/gutenberg/${book_id}`)
+
+export const adminStartGutenbergTranslation = (book_id: number) =>
+  request<{ order_id: string; message: string }>('POST', `/admin/gutenberg/${book_id}`)
+
+export type GutenbergVersion = 'standard' | 'youth' | 'tailo' | 'sxc' | 'simplified_tailo' | 'simplified_reader' | 'full_vs_simplified'
+
+export const adminGetGutenbergDownloadUrl = (order_id: string, version: GutenbergVersion) =>
+  request<{ signed_url: string }>('GET', `/admin/gutenberg/${order_id}/download-url?version=${version}`)
+
+export interface GutenbergChapterItem {
+  index: number
+  title: string
+  segment_start: number
+  segment_end: number
+  segment_count: number
+  char_count: number
+}
+
+export interface GutenbergChapterSegment {
+  index: number
+  chapter_index: number
+  chapter_title: string
+  source: string
+  translated: string
+  simplified: string
+  tailo: string
+}
+
+export interface GutenbergChaptersResponse {
+  chapters: GutenbergChapterItem[]
+  source_filename: string | null
+  total_segments: number
+  selected_chapter: GutenbergChapterItem | null
+  segments: GutenbergChapterSegment[]
+  version: string | null
+}
+
+export const adminGetGutenbergChapters = (
+  order_id: string,
+  chapter: number | null,
+  version: 'all' | GutenbergVersion = 'all',
+) => {
+  const params = new URLSearchParams()
+  if (chapter !== null) params.set('chapter', String(chapter))
+  if (version !== 'all') params.set('version', version)
+  const qs = params.toString()
+  return request<GutenbergChaptersResponse>(
+    'GET',
+    `/admin/gutenberg/${order_id}/chapters${qs ? `?${qs}` : ''}`,
+  )
+}
 
 
 // ── Language Configs ─────────────────────────────────────────────────────────

@@ -1,21 +1,9 @@
 import type { Metadata } from 'next'
-import { Noto_Serif_TC, Noto_Sans_TC } from 'next/font/google'
 import { AuthProvider } from '@/lib/auth-context'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
+import { ApiLoadingIndicator } from '@/components/ui/api-loading-indicator'
 import '../globals.css'
-
-const display = Noto_Serif_TC({
-  subsets:  ['latin'],
-  weight:   ['400', '700'],
-  variable: '--font-display',
-})
-
-const body = Noto_Sans_TC({
-  subsets:  ['latin', 'latin-ext'],
-  weight:   ['400', '500'],
-  variable: '--font-body',
-})
 
 export const metadata: Metadata = {
   title:       'OTS 翻譯服務 | 木典股份有限公司',
@@ -32,10 +20,15 @@ export default async function RootLayout({
   const messages = await getMessages()
 
   return (
-    <html lang={locale} className={`${display.variable} ${body.variable}`}>
+    <html lang={locale}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body>
         <NextIntlClientProvider messages={messages}>
           <AuthProvider>{children}</AuthProvider>
+          <ApiLoadingIndicator />
         </NextIntlClientProvider>
       </body>
     </html>

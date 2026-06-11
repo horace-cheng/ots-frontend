@@ -67,11 +67,11 @@ export default function AdminOrdersPage() {
           </button>
         ))}
         <div className="ml-auto flex gap-2">
-          {['', 'fast', 'literary'].map((t, i) => (
+          {[['', '全部'], ['fast', 'Fast'], ['literary', 'Literary'], ['gutenberg', 'Gutenberg']].map(([t, l]) => (
             <button key={t} onClick={() => setTrack(t)}
               className={`px-3 py-1 rounded-full text-xs border transition-all ${track === t ? 'bg-white/20 border-white/40 text-paper' : 'border-white/10 text-mist hover:border-white/20'
                 }`}>
-              {['全部', 'Fast', 'Literary'][i]}
+              {l}
             </button>
           ))}
         </div>

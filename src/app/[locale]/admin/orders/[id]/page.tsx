@@ -4,15 +4,18 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetOrder, adminGetDownloadUrl, adminGetBilingualDownloadUrl, adminGetPlainTextDownloadUrl,
+  adminGetGutenbergDownloadUrl,
   adminGetPipelineProgress,
   adminGetOriginalContent, adminGetTokenUsage, adminGetTokenUsageDetail,
   confirmPayment, markDelivered, adminListQaFlags,
   adminUpdateOrderStatus, adminListEligibleUsers, adminAssignEditor, adminRetranslate, adminRedeliver, adminUpdateQuote,
   adminCancelOrder, adminAssignLiteraryRole, adminCompleteLiteraryRole,
+  adminRerunStage,
   adminListSupportFiles, adminGetSupportFileContent,
   Order, QAFlag, QAResult, UserAccount, SupportFile,
   PipelineProgress,
-  TokenUsageItem, TokenUsageResponse, TokenUsageDetailItem
+  TokenUsageItem, TokenUsageResponse, TokenUsageDetailItem,
+  GutenbergVersion,
 } from '@/lib/api'
 import { StatusBadge, TrackBadge, LangLabel } from '@/components/ui/status-badge'
 import { Pagination } from '@/components/ui/pagination'
@@ -116,7 +119,7 @@ function QAScorePanel({ qa }: { qa: QAResult }) {
 }
 
 export default function AdminOrderDetailPage() {
-  const { id } = useParams<{ id: string }>()
+  const { id, locale } = useParams<{ id: string; locale: string }>()
 
   const [order,       setOrder]       = useState<(Order & { qa_result?: QAResult }) | null>(null)
   const [qaFlags,     setQaFlags]     = useState<QAFlag[]>([])
@@ -165,6 +168,42 @@ export default function AdminOrderDetailPage() {
     try {
       await adminRedeliver(id)
       alert('已開始重新生成，系統需要幾分鐘產生新檔案')
+      setTick(t => t + 1)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function handleRerunSimplifyTailo() {
+    if (!confirm('重新跑青少年版 + 台羅版 + 重新遞送。將以新程式碼重新生成這三個階段。確定繼續？')) return
+    try {
+      await adminRerunStage(id, 'simplify')
+      await adminRerunStage(id, 'tailo')
+      await adminRerunStage(id, 'deliver')
+      alert('已重新跑青少年版、台羅版與遞送。系統需要幾分鐘完成。')
+      setTick(t => t + 1)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function handleRerunChapters() {
+    if (!confirm('重新偵測章節（將以 regex 補回 LLM 遺漏的章節）。確定繼續？')) return
+    try {
+      await adminRerunStage(id, 'chapter_splitter')
+      alert('已開始重新偵測章節，系統需要幾分鐘完成。')
+      setTick(t => t + 1)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function handleRerunChaptersAndDeliver() {
+    if (!confirm('重新偵測章節（regex 補漏）→ 重新遞送（更新輸出檔案）。不重新翻譯。確定繼續？')) return
+    try {
+      await adminRerunStage(id, 'chapter_splitter')
+      await adminRerunStage(id, 'deliver')
+      alert('已開始重新偵測章節與遞送，系統需要幾分鐘完成。')
       setTick(t => t + 1)
     } catch (e: any) {
       alert(e.message)
@@ -536,6 +575,33 @@ export default function AdminOrderDetailPage() {
         </div>
       )}
 
+      {/* Gutenberg multi-version viewer */}
+      {order.track_type === 'gutenberg' && (
+        <div className="rounded-xl border border-purple-400/20 bg-purple-400/5 p-4">
+          <p className="text-base font-semibold text-purple-400 mb-3">Gutenberg 譯文檔案</p>
+          <p className="text-sm text-mist mb-3">連結有效 15 分鐘（瀏覽器開啟後可另存）</p>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { v: 'sxc'                as const, label: '原文 ↔ 標準',    color: 'bg-pink-600 hover:bg-pink-700' },
+              { v: 'simplified_tailo'   as const, label: '簡化版 ↔ 台羅',  color: 'bg-cyan-600 hover:bg-cyan-700' },
+              { v: 'full_vs_simplified' as const, label: '標準 vs 簡化',  color: 'bg-indigo-600 hover:bg-indigo-700' },
+              { v: 'simplified_reader'  as const, label: '青少年讀本',     color: 'bg-emerald-600 hover:bg-emerald-700' },
+              { v: 'standard'           as const, label: '標準全文',       color: 'bg-gray-600 hover:bg-gray-700' },
+              { v: 'youth'              as const, label: '簡化全文',       color: 'bg-amber-600 hover:bg-amber-700' },
+              { v: 'tailo'              as const, label: '台羅全文',       color: 'bg-violet-600 hover:bg-violet-700' },
+            ] as { v: GutenbergVersion; label: string; color: string }[]).map(b => (
+              <button key={b.v}
+                onClick={() => adminGetGutenbergDownloadUrl(id, b.v)
+                  .then(r => window.open(r.signed_url, '_blank', 'noopener'))
+                  .catch(e => alert(`取得連結失敗：${e.message}`))}
+                className={`px-4 py-2 rounded-md text-white text-sm font-medium transition-colors whitespace-nowrap ${b.color}`}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Redeliver (regenerate output files without re-translating) */}
       {['delivered', 'qa_review'].includes(order.status) && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-center justify-between mb-4">
@@ -543,10 +609,24 @@ export default function AdminOrderDetailPage() {
             <p className="text-base font-semibold text-mist">重新生成譯文</p>
             <p className="text-sm text-mist mt-0.5">使用既有譯文重新產出檔案（更新字體、樣式等，不重新翻譯）</p>
           </div>
-          <button onClick={handleRedeliver}
-            className="px-4 py-2 rounded-md bg-amber-400/10 text-amber-400 text-sm font-medium border border-amber-400/30 hover:bg-amber-400/20 transition-colors whitespace-nowrap">
-            重新生成
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleRerunChapters}
+              className="px-4 py-2 rounded-md bg-purple-400/10 text-purple-300 text-sm font-medium border border-purple-400/30 hover:bg-purple-400/20 transition-colors whitespace-nowrap">
+              重新偵測章節
+            </button>
+            <button onClick={handleRerunChaptersAndDeliver}
+              className="px-4 py-2 rounded-md bg-teal-400/10 text-teal-300 text-sm font-medium border border-teal-400/30 hover:bg-teal-400/20 transition-colors whitespace-nowrap">
+              章節＋遞送
+            </button>
+            <button onClick={handleRerunSimplifyTailo}
+              className="px-4 py-2 rounded-md bg-rose-400/10 text-rose-300 text-sm font-medium border border-rose-400/30 hover:bg-rose-400/20 transition-colors whitespace-nowrap">
+              重新跑青少年／台羅版
+            </button>
+            <button onClick={handleRedeliver}
+              className="px-4 py-2 rounded-md bg-amber-400/10 text-amber-400 text-sm font-medium border border-amber-400/30 hover:bg-amber-400/20 transition-colors whitespace-nowrap">
+              重新生成
+            </button>
+          </div>
         </div>
       )}
 

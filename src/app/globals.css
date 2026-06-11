@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Iansui:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400;700&family=Iansui:wght@400;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,6 +14,7 @@
   --mist:      #7a8fa8;
   --coral:     #c05540;
   --moss:      #4a7c59;
+  --night:     #0f172a;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
@@ -22,13 +23,13 @@ html { scroll-behavior: smooth; font-size: 20px; }
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: 'Iansui', var(--font-body), 'Noto Sans TC', system-ui, sans-serif;
+  font-family: 'Iansui', 'Noto Sans TC', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
 /* ── Typography ─────────────────────────────────────────────────────────────── */
-.font-display { font-family: var(--font-display), 'Iansui', 'Noto Sans TC', 'Noto Serif TC', Georgia, serif; }
+.font-display { font-family: 'Noto Serif TC', 'Iansui', Georgia, serif; }
 
 /* ── Layout ─────────────────────────────────────────────────────────────────── */
 .page-container {
@@ -249,14 +250,22 @@ label.field-label {
 .text-gold  { color: var(--gold); }
 .text-mist  { color: var(--mist); }
 .text-coral { color: var(--coral); }
+.text-paper { color: var(--paper); }
 .bg-paper   { background: var(--paper); }
 .bg-ink     { background: var(--ink); }
+.bg-night   { background: var(--night); }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .fade-up { animation: fadeUp 0.4s ease both; }
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-down { animation: fadeDown 0.3s ease both; }
 
 @keyframes spin {
   to { transform: rotate(360deg); }

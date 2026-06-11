@@ -292,7 +292,7 @@ export default function EditorVerifyPage() {
                             readability_low: '可讀性低',
                           }[f.flag_type] ?? f.flag_type}</span>
                         </div>
-                        {f.reviewer_note && <p className="text-[11px] text-gold italic">"{f.reviewer_note}"</p>}
+                        {f.reviewer_note && <p className="text-[11px] text-gold italic">&ldquo;{f.reviewer_note}&rdquo;</p>}
                       </div>
                     ))}
                   </div>

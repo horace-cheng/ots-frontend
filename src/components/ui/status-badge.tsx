@@ -32,8 +32,14 @@ export function LangLabel({ code }: { code: string }) {
   return <>{LANG_MAP[code] ?? code}</>
 }
 
+const TRACK_MAP: Record<string, { label: string; cls: string }> = {
+  fast:     { label: 'Fast Track',     cls: 'badge bg-blue-50 text-blue-700' },
+  literary: { label: 'Literary Track', cls: 'badge bg-purple-50 text-purple-700' },
+  gutenberg: { label: 'Gutenberg Track', cls: 'badge bg-emerald-50 text-emerald-700' },
+}
+
 export function TrackBadge({ track }: { track: string }) {
-  return track === 'fast'
-    ? <span className="badge bg-blue-50 text-blue-700">Fast Track</span>
-    : <span className="badge bg-purple-50 text-purple-700">Literary Track</span>
+  const t = TRACK_MAP[track]
+  if (t) return <span className={t.cls}>{t.label}</span>
+  return <span className="badge bg-white/10 text-mist">{track || '—'}</span>
 }
