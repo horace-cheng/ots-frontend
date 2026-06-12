@@ -117,7 +117,7 @@ export default function AdminOrdersPage() {
                       className="text-sm px-2 py-0.5 rounded border border-white/10 text-mist hover:text-paper hover:border-white/30 transition-colors">
                       詳情
                     </Link>
-                    {(o.status === 'qa_review' || o.status === 'delivered') && (
+                    {(o.status === 'qa_review' || o.status === 'delivered') && o.track_type !== 'gutenberg' && (
                       <Link href={`/admin/orders/${o.id}/review`}
                         className="text-sm text-paper bg-gold/20 px-2 py-0.5 rounded hover:bg-gold/30 transition-colors">
                         QA 審閱

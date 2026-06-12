@@ -420,7 +420,7 @@ export default function AdminOrderDetailPage() {
         {supportFiles.length} 個檔案
       </button>
     )]] as [string, React.ReactNode][] : []),
-    ['指派 Editor', (
+    ...(order.track_type !== 'gutenberg' ? [['指派 Editor', (
       <div key="ed" className="flex items-center gap-2">
         <select
           value={order.editor_id || ''}
@@ -434,8 +434,8 @@ export default function AdminOrderDetailPage() {
           ))}
         </select>
       </div>
-    )],
-    [order.track_type === 'literary' ? '指派校對' : '指派 QA', (
+    )]] as [string, React.ReactNode][] : []),
+    ...(order.track_type !== 'gutenberg' ? [[order.track_type === 'literary' ? '指派校對' : '指派 QA', (
       <div key="qa" className="flex items-center gap-2">
         {order.track_type === 'literary' && order.assignment_status && !['editor_done', 'proofreading'].includes(order.assignment_status) ? (
           <span className="text-xs text-mist italic">請先指派編輯並等待編輯完成</span>
@@ -458,7 +458,7 @@ export default function AdminOrderDetailPage() {
         )}
         {assigning && <div className="w-3 h-3 border border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />}
       </div>
-    )],
+    )]] as [string, React.ReactNode][] : []),
   ]
 
   return (
@@ -485,8 +485,8 @@ export default function AdminOrderDetailPage() {
       {/* Pipeline Progress */}
       {order.track_type === 'literary' && pipelineProgress && <PipelineProgressBar progress={pipelineProgress} />}
 
-      {/* QA Review Action (Fast Track only — LT uses editor/proofreader workflow) */}
-      {order.track_type !== 'literary' && (
+      {/* QA Review Action (Fast Track only — GT/LT use editor/proofreader workflow) */}
+      {order.track_type !== 'literary' && order.track_type !== 'gutenberg' && (
       <div className="flex gap-3">
         {['qa_review', 'editor_verify'].includes(order.status) && (
           <Link href={`/admin/orders/${order.id}/review`}
@@ -500,13 +500,17 @@ export default function AdminOrderDetailPage() {
             重啟 QA 審閱 (由已交付改回)
           </button>
         )}
-        {['paid', 'processing', 'qa_review', 'delivered', 'nmt_failed', 'qa_failed'].includes(order.status) && (
+       </div>
+      )}
+
+      {/* Retranslate (available for all non-LT tracks) */}
+      {order.track_type !== 'literary' && ['paid', 'processing', 'qa_review', 'delivered', 'nmt_failed', 'qa_failed'].includes(order.status) && (
+        <div className="flex gap-3">
           <button onClick={handleRetranslate}
             className="flex-1 px-4 py-3 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 text-sm hover:bg-amber-400/20 transition-all">
             重新翻譯
           </button>
-        )}
-       </div>
+        </div>
       )}
 
       {/* Literary Track Quotation */}
@@ -545,8 +549,8 @@ export default function AdminOrderDetailPage() {
         </div>
       )}
 
-      {/* Translated result */}
-      {(downloadUrl || bilingualDownloadUrl || plainTextDownloadUrl) && (
+      {/* Translated result (hidden for Gutenberg — uses its own section below) */}
+      {order.track_type !== 'gutenberg' && (downloadUrl || bilingualDownloadUrl || plainTextDownloadUrl) && (
         <div className="rounded-xl border border-green-400/20 bg-green-400/5 p-4 flex items-center justify-between">
           <div>
             <p className="text-base font-semibold text-green-400">譯文檔案</p>
