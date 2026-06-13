@@ -581,6 +581,7 @@ export default function AdminOrderDetailPage() {
 
       {/* Gutenberg multi-version viewer */}
       {order.track_type === 'gutenberg' && (
+        <>
         <div className="rounded-xl border border-purple-400/20 bg-purple-400/5 p-4">
           <p className="text-base font-semibold text-purple-400 mb-3">Gutenberg 譯文檔案</p>
           <p className="text-sm text-mist mb-3">連結有效 15 分鐘（瀏覽器開啟後可另存）</p>
@@ -604,6 +605,13 @@ export default function AdminOrderDetailPage() {
             ))}
           </div>
         </div>
+        <Link href={`/admin/orders/${id}/video-storyboard`}
+          className="block rounded-xl border border-amber-400/20 bg-amber-400/5 p-4
+                     hover:bg-amber-400/10 transition-colors">
+          <p className="text-base font-semibold text-amber-400">🎬 影片分鏡腳本</p>
+          <p className="text-sm text-mist mt-0.5">編輯分鏡、設定語者，批准後自動生成影片素材</p>
+        </Link>
+        </>
       )}
 
       {/* Redeliver (regenerate output files without re-translating) */}

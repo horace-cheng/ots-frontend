@@ -172,6 +172,82 @@ export const adminGetPipelineProgress = (id: string) =>
 export const adminGetTokenUsage = (orderId: string) =>
   request<TokenUsageResponse>('GET', `/admin/orders/${orderId}/token-usage`)
 
+// ── Video Materials (Gutenberg Track) ─────────────────────────────────────────
+export const adminGetVideoMaterials = (orderId: string) =>
+  request<{
+    materials: VideoMaterials | null
+    message?: string
+    scene_assets?: Record<string, { audio_url: string | null; image_url: string | null }>
+    chapter_videos?: Record<string, string>
+    chapter_srts?: Record<string, string>
+  }>(
+    'GET', `/admin/orders/${orderId}/video-materials`
+  )
+
+export const adminSaveVideoMaterials = (orderId: string, materials: VideoMaterials) =>
+  request<{ message: string }>(
+    'PUT', `/admin/orders/${orderId}/video-materials`, { materials }
+  )
+
+export const adminApproveVideoMaterials = (
+  orderId: string,
+  materials: VideoMaterials,
+  voice_id?: string,
+  speaking_rate?: number,
+) =>
+  request<{ message: string; order_id: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/approve`,
+    { materials, voice_id, speaking_rate }
+  )
+
+export const adminSceneTts = (
+  orderId: string,
+  chapter_index: number,
+  scene_index: number,
+  text: string,
+  voice_id?: string,
+  speaking_rate?: number,
+) =>
+  request<{ audio_data_url: string; gcs_path: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/tts`,
+    { chapter_index, scene_index, text, voice_id, speaking_rate }
+  )
+
+export const adminSceneImage = (
+  orderId: string,
+  chapter_index: number,
+  scene_index: number,
+  prompt: string,
+) =>
+  request<{ image_data_url: string; gcs_path: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/image`,
+    { chapter_index, scene_index, prompt }
+  )
+
+export const adminChapterAssemble = (
+  orderId: string,
+  chapter_index: number,
+) =>
+  request<{ video_url: string; srt_url: string | null; gcs_path: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/chapter/assemble`,
+    { chapter_index }
+  )
+
+export const adminSaveChapterSrt = (
+  orderId: string,
+  chapter_index: number,
+  srt_content: string,
+) =>
+  request<{ srt_url: string }>(
+    'PUT', `/admin/orders/${orderId}/video-materials/chapter/srt`,
+    { chapter_index, srt_content }
+  )
+
+export const adminGenerateStoryboard = (orderId: string) =>
+  request<{ message: string; order_id: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/generate-storyboard`
+  )
+
 export const adminGetTokenUsageDetail = (orderId: string, params?: { limit?: number; offset?: number }) =>
   request<TokenUsageDetailResponse>('GET', `/admin/orders/${orderId}/token-usage-detail`, undefined, params)
 
@@ -688,6 +764,44 @@ export interface PipelineProgress {
   completed_batches:  number
   total_segments:     number
   completed_segments: number
+}
+
+// ── Video Materials (Gutenberg Track) ─────────────────────────────────────────
+export interface VideoScene {
+  scene_index:    number
+  narration_text: string
+  visual_prompt:  string
+  duration_est:   string
+}
+
+export interface VideoChapter {
+  chapter_index: number
+  title:         string
+  scenes:        VideoScene[]
+}
+
+export interface VideoGlobalStyle {
+  characters:   Record<string, string>
+  environment:  string
+}
+
+export interface VideoMaterials {
+  global_style: VideoGlobalStyle
+  chapters:     VideoChapter[]
+  settings:     {
+    voice_id:      string
+    speaking_rate: number
+  }
+}
+
+export const ZH_CHAPTER_TITLES: Record<number, string> = {
+  0: '原始荒野',
+  1: '棍棒與利牙的法則',
+  2: '原始巨獸的統治',
+  3: '誰奪得主權',
+  4: '拖繩與道路的苦役',
+  5: '為了對一個人的愛',
+  6: '呼喚的聲音',
 }
 
 // ── Translation Versions ────────────────────────────────────────────────────
