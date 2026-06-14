@@ -97,6 +97,7 @@ export default function VideoStoryboardPage() {
   const [srtEditorOpen, setSrtEditorOpen] = useState(false)
   const [srtEditorChapter, setSrtEditorChapter] = useState<number | null>(null)
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([])
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const assetKey = (ch: number, sc: number) => `${ch}_${sc}`
 
@@ -593,9 +594,10 @@ export default function VideoStoryboardPage() {
                       {/* Image preview */}
                       {assets.imageUrl && (
                         <div className="space-y-1">
-                          <p className="text-[10px] text-mist/60">圖片預覽</p>
+                          <p className="text-[10px] text-mist/60">圖片預覽（點擊放大）</p>
                           <img src={assets.imageUrl} alt="Generated visual"
-                            className="rounded border border-white/10 max-w-full max-h-48 object-contain" />
+                            className="rounded border border-white/10 max-w-full max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setPreviewImageUrl(assets.imageUrl)} />
                         </div>
                       )}
                     </div>
@@ -637,6 +639,21 @@ export default function VideoStoryboardPage() {
                 下載字幕 (.srt)
               </a>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Image preview modal */}
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewImageUrl(null)}>
+          <div className="relative max-w-5xl w-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setPreviewImageUrl(null)}
+              className="self-end mb-2 text-white/70 hover:text-white text-sm">
+              關閉 ✕
+            </button>
+            <img src={previewImageUrl} alt="Preview"
+              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
           </div>
         </div>
       )}
