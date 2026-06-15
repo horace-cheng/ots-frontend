@@ -207,10 +207,11 @@ export const adminSceneTts = (
   text: string,
   voice_id?: string,
   speaking_rate?: number,
+  language?: string,
 ) =>
   request<{ audio_data_url: string; gcs_path: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/scene/tts`,
-    { chapter_index, scene_index, text, voice_id, speaking_rate }
+    { chapter_index, scene_index, text, voice_id, speaking_rate, language }
   )
 
 export const adminSceneImage = (
@@ -227,10 +228,11 @@ export const adminSceneImage = (
 export const adminChapterAssemble = (
   orderId: string,
   chapter_index: number,
+  language: string = 'zh',
 ) =>
   request<{ video_url: string; srt_url: string | null; gcs_path: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/chapter/assemble`,
-    { chapter_index }
+    { chapter_index, language }
   )
 
 export const adminSaveChapterSrt = (
@@ -246,6 +248,15 @@ export const adminSaveChapterSrt = (
 export const adminGenerateStoryboard = (orderId: string) =>
   request<{ message: string; order_id: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/generate-storyboard`
+  )
+
+export const adminCleanVideoAssets = (
+  orderId: string,
+  options?: { backup?: boolean; language?: string; remove_materials?: boolean }
+) =>
+  request<{ message: string; backup_taken: boolean; remove_materials: boolean; backup_prefix: string | null; deleted: Record<string, number> }>(
+    'POST', `/admin/orders/${orderId}/video-materials/clean`,
+    { backup: options?.backup ?? true, language: options?.language ?? '', remove_materials: options?.remove_materials ?? false }
   )
 
 export const adminGetTokenUsageDetail = (orderId: string, params?: { limit?: number; offset?: number }) =>
@@ -767,11 +778,19 @@ export interface PipelineProgress {
 }
 
 // ── Video Materials (Gutenberg Track) ─────────────────────────────────────────
+export interface VideoSceneTrack {
+  narration_text: string
+}
+
 export interface VideoScene {
   scene_index:    number
-  narration_text: string
+  narration_text?: string       // legacy flat field (pre-dual-track files)
   visual_prompt:  string
   duration_est:   string
+  tracks?: {
+    zh:     VideoSceneTrack
+    "tai-lo": VideoSceneTrack
+  }
 }
 
 export interface VideoChapter {
@@ -792,16 +811,6 @@ export interface VideoMaterials {
     voice_id:      string
     speaking_rate: number
   }
-}
-
-export const ZH_CHAPTER_TITLES: Record<number, string> = {
-  0: '原始荒野',
-  1: '棍棒與利牙的法則',
-  2: '原始巨獸的統治',
-  3: '誰奪得主權',
-  4: '拖繩與道路的苦役',
-  5: '為了對一個人的愛',
-  6: '呼喚的聲音',
 }
 
 // ── Translation Versions ────────────────────────────────────────────────────
