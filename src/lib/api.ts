@@ -208,10 +208,12 @@ export const adminSceneTts = (
   voice_id?: string,
   speaking_rate?: number,
   language?: string,
+  short_pause_duration?: number,
+  long_pause_duration?: number,
 ) =>
   request<{ audio_data_url: string; gcs_path: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/scene/tts`,
-    { chapter_index, scene_index, text, voice_id, speaking_rate, language }
+    { chapter_index, scene_index, text, voice_id, speaking_rate, language, short_pause_duration, long_pause_duration }
   )
 
 export const adminSceneImage = (
@@ -223,6 +225,12 @@ export const adminSceneImage = (
   request<{ image_data_url: string; gcs_path: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/scene/image`,
     { chapter_index, scene_index, prompt }
+  )
+
+export const adminSceneRetranslate = (orderId: string, chapter_index: number, scene_index: number) =>
+  request<{ tai_lo_text: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/retranslate`,
+    { chapter_index, scene_index }
   )
 
 export const adminChapterAssemble = (
@@ -808,8 +816,12 @@ export interface VideoMaterials {
   global_style: VideoGlobalStyle
   chapters:     VideoChapter[]
   settings:     {
-    voice_id:      string
-    speaking_rate: number
+    voice_id:             string
+    speaking_rate:        number
+    voice_id_zh?:         string
+    voice_id_tai_lo?:     string
+    short_pause_duration?: number
+    long_pause_duration?:  number
   }
 }
 

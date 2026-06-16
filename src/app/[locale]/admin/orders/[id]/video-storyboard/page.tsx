@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetVideoMaterials, adminSaveVideoMaterials,
-  adminSceneTts, adminSceneImage, adminChapterAssemble,
+  adminSceneTts, adminSceneImage, adminSceneRetranslate, adminChapterAssemble,
   adminGenerateStoryboard, adminCleanVideoAssets,
   VideoMaterials, VideoChapter, VideoScene,
 } from '@/lib/api'
@@ -92,9 +92,9 @@ export default function VideoStoryboardPage() {
   const [generatingStoryboard, setGeneratingStoryboard] = useState(false)
   const [message, setMessage] = useState('')
   const [activeChapter, setActiveChapter] = useState(0)
-  const [voiceSettings, setVoiceSettings] = useState<Record<Track, { voiceId: string; speakingRate: number }>>({
-    zh: { voiceId: TRACK_DEFAULT_VOICES.zh, speakingRate: 1.0 },
-    'tai-lo': { voiceId: TRACK_DEFAULT_VOICES['tai-lo'], speakingRate: 1.0 },
+  const [voiceSettings, setVoiceSettings] = useState<Record<Track, { voiceId: string; speakingRate: number; shortPause: number; longPause: number }>>({
+    zh: { voiceId: TRACK_DEFAULT_VOICES.zh, speakingRate: 1.0, shortPause: 150, longPause: 450 },
+    'tai-lo': { voiceId: TRACK_DEFAULT_VOICES['tai-lo'], speakingRate: 1.0, shortPause: 150, longPause: 450 },
   })
   const [sceneAssets, setSceneAssets] = useState<SceneAssets>({})
   const [chapterVideoUrls, setChapterVideoUrls] = useState<Record<string, string>>({})
@@ -121,8 +121,18 @@ export default function VideoStoryboardPage() {
         if (s) {
           setVoiceSettings(prev => ({
             ...prev,
-            zh: { ...prev.zh, voiceId: (s as any).voice_id_zh || s.voice_id || TRACK_DEFAULT_VOICES.zh },
-            'tai-lo': { ...prev['tai-lo'], voiceId: (s as any).voice_id_tai_lo || TRACK_DEFAULT_VOICES['tai-lo'] },
+            zh: {
+              ...prev.zh,
+              voiceId: (s as any).voice_id_zh || s.voice_id || TRACK_DEFAULT_VOICES.zh,
+              shortPause: (s as any).short_pause_duration ?? prev.zh.shortPause,
+              longPause: (s as any).long_pause_duration ?? prev.zh.longPause,
+            },
+            'tai-lo': {
+              ...prev['tai-lo'],
+              voiceId: (s as any).voice_id_tai_lo || TRACK_DEFAULT_VOICES['tai-lo'],
+              shortPause: (s as any).short_pause_duration ?? prev['tai-lo'].shortPause,
+              longPause: (s as any).long_pause_duration ?? prev['tai-lo'].longPause,
+            },
           }))
         }
       } else {
@@ -220,7 +230,7 @@ export default function VideoStoryboardPage() {
     setMessage('')
     try {
       const vs = voiceSettings[track]
-      const r = await adminSceneTts(id, chIdx, sIdx, text, vs.voiceId, vs.speakingRate, track)
+      const r = await adminSceneTts(id, chIdx, sIdx, text, vs.voiceId, vs.speakingRate, track, vs.shortPause, vs.longPause)
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioUrl: r.audio_data_url, audioState: 'done' as AssetState } }))
     } catch (e: unknown) {
       setMessage(`TTS 生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
@@ -242,6 +252,38 @@ export default function VideoStoryboardPage() {
     } catch (e: unknown) {
       setMessage(`圖片生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageState: 'error' as AssetState } }))
+    }
+  }, [materials, id])
+
+  const handleSceneRetranslate = useCallback(async (chIdx: number, sIdx: number) => {
+    if (!materials) return
+    setMessage('')
+    try {
+      const r = await adminSceneRetranslate(id, chIdx, sIdx)
+      setMaterials(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          chapters: prev.chapters.map((ch, ci) =>
+            ci === chIdx
+              ? {
+                  ...ch,
+                  scenes: ch.scenes.map((sc, si) => {
+                    if (si !== sIdx) return sc
+                    const tracks = sc.tracks || { zh: { narration_text: '' }, 'tai-lo': { narration_text: '' } }
+                    return { ...sc, tracks: { ...tracks, 'tai-lo': { narration_text: r.tai_lo_text } } }
+                  })
+                }
+              : ch
+          ),
+        }
+      })
+      // Clear stale Tai-lo audio asset
+      const taiLoKey = assetKey(chIdx, sIdx, 'tai-lo')
+      setSceneAssets(prev => ({ ...prev, [taiLoKey]: { audioUrl: '', imageUrl: prev[taiLoKey]?.imageUrl || '', audioState: 'idle', imageState: prev[taiLoKey]?.imageState || 'idle' } }))
+      setMessage('台語翻譯完成')
+    } catch (e: unknown) {
+      setMessage(`台語翻譯失敗：${e instanceof Error ? e.message : 'unknown'}`)
     }
   }, [materials, id])
 
@@ -288,7 +330,7 @@ export default function VideoStoryboardPage() {
       if (skipExisting && existing?.audioState === 'done') continue
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioState: 'loading', audioUrl: prev[key]?.audioUrl || '' } }))
       try {
-        const r = await adminSceneTts(id, chIdx, sIdx, text, vs.voiceId, vs.speakingRate, track)
+        const r = await adminSceneTts(id, chIdx, sIdx, text, vs.voiceId, vs.speakingRate, track, vs.shortPause, vs.longPause)
         setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioUrl: r.audio_data_url, audioState: 'done' as AssetState } }))
       } catch {
         setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioState: 'error' as AssetState } }))
@@ -352,8 +394,18 @@ export default function VideoStoryboardPage() {
                   if (s) {
                     setVoiceSettings(prev => ({
                       ...prev,
-                      zh: { ...prev.zh, voiceId: (s as any).voice_id_zh || s.voice_id || TRACK_DEFAULT_VOICES.zh },
-                      'tai-lo': { ...prev['tai-lo'], voiceId: (s as any).voice_id_tai_lo || TRACK_DEFAULT_VOICES['tai-lo'] },
+                      zh: {
+                        ...prev.zh,
+                        voiceId: (s as any).voice_id_zh || s.voice_id || TRACK_DEFAULT_VOICES.zh,
+                        shortPause: (s as any).short_pause_duration ?? prev.zh.shortPause,
+                        longPause: (s as any).long_pause_duration ?? prev.zh.longPause,
+                      },
+                      'tai-lo': {
+                        ...prev['tai-lo'],
+                        voiceId: (s as any).voice_id_tai_lo || TRACK_DEFAULT_VOICES['tai-lo'],
+                        shortPause: (s as any).short_pause_duration ?? prev['tai-lo'].shortPause,
+                        longPause: (s as any).long_pause_duration ?? prev['tai-lo'].longPause,
+                      },
                     }))
                   }
                   const parsed: SceneAssets = {}
@@ -454,7 +506,21 @@ export default function VideoStoryboardPage() {
                   <label className="text-xs text-mist block mb-1">語速 ({TRACK_LABELS[t]}) — {voiceSettings[t].speakingRate.toFixed(1)}</label>
                   <input type="range" min="0.25" max="4.0" step="0.25"
                     value={voiceSettings[t].speakingRate}
-                    onChange={e => setVoiceSettings(prev => ({ ...prev, [t]: { ...prev[t], speakingRate: parseFloat(e.target.value) } }))}
+                    onChange={e => { const v = parseFloat(e.target.value); setVoiceSettings(prev => ({ ...prev, [t]: { ...prev[t], speakingRate: v } })); setMaterials(prev => prev ? { ...prev, settings: { ...prev.settings, speaking_rate: v } } : prev) }}
+                    className="w-28 accent-gold" />
+                </div>
+                <div>
+                  <label className="text-xs text-mist block mb-1">短停頓 ({TRACK_LABELS[t]}) — {voiceSettings[t].shortPause}ms</label>
+                  <input type="range" min="0" max="500" step="10"
+                    value={voiceSettings[t].shortPause}
+                    onChange={e => { const v = parseInt(e.target.value); setVoiceSettings(prev => ({ ...prev, [t]: { ...prev[t], shortPause: v } })); setMaterials(prev => prev ? { ...prev, settings: { ...prev.settings, short_pause_duration: v } } : prev) }}
+                    className="w-28 accent-gold" />
+                </div>
+                <div>
+                  <label className="text-xs text-mist block mb-1">長停頓 ({TRACK_LABELS[t]}) — {voiceSettings[t].longPause}ms</label>
+                  <input type="range" min="0" max="1000" step="10"
+                    value={voiceSettings[t].longPause}
+                    onChange={e => { const v = parseInt(e.target.value); setVoiceSettings(prev => ({ ...prev, [t]: { ...prev[t], longPause: v } })); setMaterials(prev => prev ? { ...prev, settings: { ...prev.settings, long_pause_duration: v } } : prev) }}
                     className="w-28 accent-gold" />
                 </div>
               </div>
@@ -619,6 +685,12 @@ export default function VideoStoryboardPage() {
                               onChange={e => { updateScene(chapter.chapter_index, sIdx, 'narration_text', e.target.value, t); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                               dir="auto"
                               className="w-full rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden" />
+                            {t === 'tai-lo' && (
+                              <button onClick={() => handleSceneRetranslate(chapter.chapter_index, sIdx)}
+                                className="mt-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors">
+                                🔄 台語翻譯
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
