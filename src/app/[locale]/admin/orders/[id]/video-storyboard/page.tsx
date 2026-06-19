@@ -194,7 +194,7 @@ export default function VideoStoryboardPage() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [materials, id])
 
-  function updateScene(chIdx: number, sIdx: number, field: string, val: string, track?: string) {
+  function updateScene(chIdx: number, sIdx: number, field: string, val: string, track?: 'zh' | 'tai-lo') {
     if (!materials) return
     setMaterials(prev => {
       if (!prev) return prev
@@ -208,8 +208,9 @@ export default function VideoStoryboardPage() {
                   if (si !== sIdx) return sc
                   if (field === 'visual_prompt') return { ...sc, visual_prompt: val }
                   // narration_text for a specific track
-                  const tracks = sc.tracks || { 'tai-lo': { narration_text: sc.narration_text || '' } }
-                  return { ...sc, tracks: { ...tracks, 'tai-lo': { narration_text: val } } }
+                  const existingTracks = sc.tracks || { 'tai-lo': { narration_text: sc.narration_text || '' } }
+                  const lang = track || 'tai-lo' as const
+                  return { ...sc, tracks: { ...existingTracks, [lang]: { narration_text: val } } }
                 })
               }
             : ch
