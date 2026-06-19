@@ -244,6 +244,16 @@ export const adminSceneVideo = (
     { chapter_index, scene_index, language }
   )
 
+export const adminSceneReferenceImage = (
+  orderId: string,
+  chapter_index: number,
+  scene_index: number,
+) =>
+  request<{ image_data_url: string; gcs_path: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/reference-image`,
+    { chapter_index, scene_index }
+  )
+
 export const adminChapterMerge = (
   orderId: string,
   chapter_index: number,

@@ -147,13 +147,13 @@ export default function VideoStoryboardPage() {
         const parsed: SceneAssets = {}
         for (const [k, v] of Object.entries(r.scene_assets)) {
           const audioUrl = (v as any).audio_url || ''
-          const imageUrl = (v as any).image_url || ''
+          const refUrl = (v as any).reference_image_url || ''
           parsed[k] = {
             audioUrl,
-            imageUrl,
+            imageUrl: refUrl,
             videoUrl: (v as any).video_url || '',
             audioState: audioUrl ? ('done' as AssetState) : ('idle' as AssetState),
-            imageState: imageUrl ? ('done' as AssetState) : ('idle' as AssetState),
+            imageState: refUrl ? ('done' as AssetState) : ('idle' as AssetState),
             videoState: (v as any).video_url ? ('done' as AssetState) : ('idle' as AssetState),
             audioDuration: (v as any).audio_duration || 0,
           }
@@ -293,6 +293,25 @@ export default function VideoStoryboardPage() {
       setChapterVideoState(prev => ({ ...prev, [chKey]: 'error' }))
     }
   }, [id])
+
+  const handleSceneReferenceImage = useCallback(async (chIdx: number, sIdx: number) => {
+    if (!materials) return
+    const key = `${chIdx}_${sIdx}`
+    // Update both tracks' imageState
+    const updateState = (k: string) => setSceneAssets(prev => ({ ...prev, [k]: { ...prev[k], imageState: 'loading', imageUrl: prev[k]?.imageUrl || '' } }))
+    for (const t of (['zh', 'tai-lo'] as Track[])) updateState(assetKey(chIdx, sIdx, t))
+    setMessage('')
+    try {
+      const r = await adminSceneReferenceImage(id, chIdx, sIdx)
+      const setDone = (k: string) => setSceneAssets(prev => ({ ...prev, [k]: { ...prev[k], imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
+      for (const t of (['zh', 'tai-lo'] as Track[])) setDone(assetKey(chIdx, sIdx, t))
+      setMessage('參考圖片已產生')
+    } catch (e: unknown) {
+      const setErr = (k: string) => setSceneAssets(prev => ({ ...prev, [k]: { ...prev[k], imageState: 'error' as AssetState } }))
+      for (const t of (['zh', 'tai-lo'] as Track[])) setErr(assetKey(chIdx, sIdx, t))
+      setMessage(`參考圖片產生失敗：${e instanceof Error ? e.message : 'unknown'}`)
+    }
+  }, [materials, id])
 
   const handleSceneVideo = useCallback(async (chIdx: number, sIdx: number, track: Track) => {
     const key = assetKey(chIdx, sIdx, track)
@@ -773,17 +792,44 @@ export default function VideoStoryboardPage() {
 
 
 
+                        {/* Reference image — shared across tracks */}
+                        <div className="flex items-center gap-1">
+                          {(['zh', 'tai-lo'] as Track[]).map(t => {
+                            const ik = assetKey(chapter.chapter_index, sIdx, t)
+                            const i = sceneAssets[ik] || { audioUrl: '', imageUrl: '', audioState: 'idle', imageState: 'idle' }
+                            if (t !== 'zh') return null
+                            return (
+                              <div key={t} className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleSceneReferenceImage(chapter.chapter_index, sIdx)}
+                                  disabled={i.imageState === 'loading'}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40
+                                    ${i.imageState === 'done' ? 'bg-green-900/30 text-green-300 border border-green-700/30' : 'bg-white/10 text-paper hover:bg-white/20'}`}>
+                                  {i.imageState === 'loading' ? '⏳' : i.imageUrl ? `🖼 重新參考` : `🖼 參考圖片`}
+                                </button>
+                                {i.imageUrl && (
+                                  <button onClick={() => setSceneVideoPreview({ videoUrl: i.imageUrl, track: t })}
+                                    className="w-7 h-7 rounded-full bg-white/10 text-paper border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors text-xs"
+                                    title="預覽參考圖片">👁</button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
                         {/* Video — per track */}
                         {(['zh', 'tai-lo'] as Track[]).map(t => {
                           const vk = assetKey(chapter.chapter_index, sIdx, t)
                           const v = sceneAssets[vk] || { audioUrl: '', imageUrl: '', videoUrl: '', audioState: 'idle', imageState: 'idle', videoState: 'idle', audioDuration: 0 }
+                          const noRef = v.imageState !== 'done'
                           return (
                             <div key={t} className="flex items-center gap-1">
                               <button
-                                onClick={() => handleSceneVideo(chapter.chapter_index, sIdx, t)}
-                                disabled={v.videoState === 'loading'}
+                                onClick={() => noRef ? undefined : handleSceneVideo(chapter.chapter_index, sIdx, t)}
+                                disabled={v.videoState === 'loading' || noRef}
+                                title={noRef ? '請先產生參考圖片' : ''}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40
-                                  ${v.videoState === 'done' ? 'bg-green-900/30 text-green-300 border border-green-700/30' : 'bg-white/10 text-paper hover:bg-white/20'}`}>
+                                  ${noRef ? 'bg-gray-800/50 text-mist/50 cursor-not-allowed' : v.videoState === 'done' ? 'bg-green-900/30 text-green-300 border border-green-700/30' : 'bg-white/10 text-paper hover:bg-white/20'}`}>
                                 {v.videoState === 'loading' ? '⏳' : v.videoUrl ? `🎬 ${TRACK_LABELS[t]} 重新` : `🎬 ${TRACK_LABELS[t]} 影片`}
                               </button>
                               {v.videoUrl && (
