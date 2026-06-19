@@ -7,7 +7,7 @@ import {
   adminGetVideoMaterials, adminSaveVideoMaterials,
   adminSceneTts, adminSceneVideo, adminGetSceneVideoTask,
   adminSceneReferenceImage, adminSceneVideoUpload,
-  adminChapterAssemble, adminChapterMerge, adminSceneRegeneratePrompt,
+  adminChapterAssemble, adminSceneRegeneratePrompt,
   adminGenerateStoryboard, adminCleanVideoAssets,
   VideoMaterials, VideoChapter, VideoScene,
 } from '@/lib/api'
@@ -194,7 +194,7 @@ export default function VideoStoryboardPage() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [materials, id])
 
-  function updateScene(chIdx: number, sIdx: number, field: string, val: string, track?: Track) {
+  function updateScene(chIdx: number, sIdx: number, field: string, val: string, track?: string) {
     if (!materials) return
     setMaterials(prev => {
       if (!prev) return prev
@@ -312,22 +312,6 @@ export default function VideoStoryboardPage() {
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'error' as AssetState } }))
     }
   }, [materials, id])
-
-  const handleChapterMerge = useCallback(async (chIdx: number, track: Track) => {
-    const chKey = `${chIdx}_${track}`
-    setChapterVideoState(prev => ({ ...prev, [chKey]: 'loading' }))
-    setMessage('')
-    try {
-      const r = await adminChapterMerge(id, chIdx, track)
-      setChapterVideoUrls(prev => ({ ...prev, [chKey]: r.video_url }))
-      const srtUrl = r.srt_url
-      if (srtUrl) setChapterSrtUrls(prev => ({ ...prev, [chKey]: srtUrl }))
-      setChapterVideoState(prev => ({ ...prev, [chKey]: 'done' }))
-    } catch (e: unknown) {
-      setMessage(`章節影片合併失敗：${e instanceof Error ? e.message : 'unknown'}`)
-      setChapterVideoState(prev => ({ ...prev, [chKey]: 'error' }))
-    }
-  }, [id])
 
   const handleSceneVideoUpload = useCallback(async (chIdx: number, sIdx: number, track: Track, mergeAudio: boolean, file: File) => {
     const key = assetKey(chIdx, sIdx, track)
@@ -631,9 +615,11 @@ export default function VideoStoryboardPage() {
               </button>
               {(() => {
                 const chKey = `${chapter.chapter_index}_tai-lo`
+                const hasVideo = !!chapterVideoUrls[chKey]
+                const isBusy = chapterVideoState[chKey] === 'loading'
                 return (
                   <div className="flex items-center gap-1">
-                    {chapterVideoUrls[chKey] ? (
+                    {hasVideo && (
                       <>
                         <button
                           onClick={() => setVideoViewerChapter({ chIdx: chapter.chapter_index, track: 'tai-lo' })}
@@ -645,26 +631,17 @@ export default function VideoStoryboardPage() {
                             驗證
                           </button>
                         )}
-                        <button
-                          onClick={() => handleChapterMerge(chapter.chapter_index, 'tai-lo')}
-                          disabled={chapterVideoState[chKey] === 'loading'}
-                          className="px-2 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors">
-                          {chapterVideoState[chKey] === 'loading' ? '⏳' : '🔗 合併 台語'}
-                        </button>
-                        <button
-                          onClick={() => handleChapterAssemble(chapter.chapter_index, 'tai-lo')}
-                          className="px-2 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors">
-                          🔄 台語
-                        </button>
                       </>
-                    ) : (
-                      <button
-                        onClick={() => handleChapterAssemble(chapter.chapter_index, 'tai-lo')}
-                        disabled={chapterVideoState[chKey] === 'loading'}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gold text-white hover:bg-gold/90 disabled:opacity-40 transition-colors shadow-lg shadow-gold/20">
-                        {chapterVideoState[chKey] === 'loading' ? '⏳' : '🎬 台語影片'}
-                      </button>
                     )}
+                    <button
+                      onClick={() => handleChapterAssemble(chapter.chapter_index, 'tai-lo')}
+                      disabled={isBusy}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40
+                        ${hasVideo
+                          ? 'bg-white/10 text-paper hover:bg-white/20'
+                          : 'bg-gold text-white hover:bg-gold/90 shadow-lg shadow-gold/20'}`}>
+                      {isBusy ? '⏳' : hasVideo ? '🎬 重新生成' : '🎬 台語影片'}
+                    </button>
                   </div>
                 )
               })()}
@@ -732,10 +709,12 @@ export default function VideoStoryboardPage() {
                       {/* Narration — zh reference + tai-lo editable */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs text-mist block mb-1">華語旁白 (參考)</label>
-                          <div className="w-full rounded bg-[#1e293b]/50 border border-white/5 text-paper/70 text-sm px-3 py-2 min-h-[38px] whitespace-pre-wrap">
-                            {scene.tracks?.zh?.narration_text || scene.narration_text || ''}
-                          </div>
+                          <label className="text-xs text-mist block mb-1">華語旁白</label>
+                          <textarea value={scene.tracks?.zh?.narration_text || scene.narration_text || ''}
+                            ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}}
+                            onChange={e => { updateScene(chapter.chapter_index, sIdx, 'narration_text', e.target.value, 'zh'); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                            dir="auto"
+                            className="w-full rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden" />
                         </div>
                         <div>
                           <label className="text-xs text-mist block mb-1">台語旁白</label>
