@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   adminGetVideoMaterials, adminSaveVideoMaterials,
   adminSceneTts, adminSceneRetranslate, adminSceneVideo, adminGetSceneVideoTask,
-  adminSceneReferenceImage,
+  adminSceneReferenceImage, adminSceneVideoUpload,
   adminChapterAssemble, adminChapterMerge, adminSceneRegeneratePrompt,
   adminGenerateStoryboard, adminCleanVideoAssets,
   VideoMaterials, VideoChapter, VideoScene,
@@ -379,6 +379,19 @@ export default function VideoStoryboardPage() {
     } catch (e: unknown) {
       setMessage(`章節影片合併失敗：${e instanceof Error ? e.message : 'unknown'}`)
       setChapterVideoState(prev => ({ ...prev, [chKey]: 'error' }))
+    }
+  }, [id])
+
+  const handleSceneVideoUpload = useCallback(async (chIdx: number, sIdx: number, track: Track, mergeAudio: boolean, file: File) => {
+    const key = assetKey(chIdx, sIdx, track)
+    setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'loading', videoUrl: '' } }))
+    setMessage('')
+    try {
+      const r = await adminSceneVideoUpload(id, chIdx, sIdx, track, mergeAudio, file)
+      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoUrl: r.video_data_url, videoState: 'done' as AssetState } }))
+    } catch (e: unknown) {
+      setMessage(`上傳影片失敗：${e instanceof Error ? e.message : 'unknown'}`)
+      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'error' as AssetState } }))
     }
   }, [id])
 
@@ -880,6 +893,7 @@ export default function VideoStoryboardPage() {
                           const vk = assetKey(chapter.chapter_index, sIdx, t)
                           const v = sceneAssets[vk] || { audioUrl: '', imageUrl: '', videoUrl: '', audioState: 'idle', imageState: 'idle', videoState: 'idle', audioDuration: 0 }
                           const noRef = v.imageState !== 'done'
+                          const fileInputId = `video-upload-${chapter.chapter_index}-${sIdx}-${t}`
                           return (
                             <div key={t} className="flex items-center gap-1">
                               <button
@@ -895,6 +909,26 @@ export default function VideoStoryboardPage() {
                                   className="w-7 h-7 rounded-full bg-green-900/40 text-green-300 border border-green-700/30 flex items-center justify-center hover:bg-green-800/40 transition-colors text-xs"
                                   title="預覽場景影片">▶</button>
                               )}
+                              <label htmlFor={fileInputId}
+                                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors cursor-pointer"
+                                title="上傳影片 (取代 AI 生成)">
+                                📤
+                              </label>
+                              <span className="flex items-center gap-1 text-xs text-mist">
+                                <input id={fileInputId + '-merge'} type="checkbox" defaultChecked
+                                  className="accent-gold" />
+                                <label htmlFor={fileInputId + '-merge'}>合併語音</label>
+                              </span>
+                              <input id={fileInputId} type="file" accept="video/mp4,video/webm,video/quicktime"
+                                className="hidden"
+                                onChange={e => {
+                                  const f = e.target.files?.[0]
+                                  if (!f) return
+                                  const cb = document.getElementById(fileInputId + '-merge') as HTMLInputElement | null
+                                  const mergeAudio = cb ? cb.checked : false
+                                  handleSceneVideoUpload(chapter.chapter_index, sIdx, t, mergeAudio, f)
+                                  e.target.value = ''
+                                }} />
                             </div>
                           )
                         })}

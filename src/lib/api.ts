@@ -77,6 +77,21 @@ async function request<T>(
   })
 }
 
+async function requestFormData<T>(method: string, path: string, formData: FormData): Promise<T> {
+  const token = await getIdToken()
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  return wrapLoading(async () => {
+    const res = await fetch(`${BASE}${path}`, { method, headers, body: formData })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new ApiError(err.detail || `HTTP ${res.status}`, res.status)
+    }
+    return res.json()
+  })
+}
+
 // ── Orders ────────────────────────────────────────────────────────────────────
 export const createOrder = (data: {
   track_type: string; source_lang: string; target_lang: string
@@ -251,6 +266,25 @@ export const adminGetSceneVideoTask = (
   request<{ status: string; video_data_url?: string; gcs_path?: string; duration_sec?: number; error?: string }>(
     'GET', `/admin/orders/${orderId}/video-materials/scene/video-task/${taskId}`
   )
+
+export const adminSceneVideoUpload = (
+  orderId: string,
+  chapter_index: number,
+  scene_index: number,
+  language: string,
+  mergeAudio: boolean,
+  file: File,
+) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('chapter_index', String(chapter_index))
+  fd.append('scene_index', String(scene_index))
+  fd.append('language', language)
+  fd.append('merge_audio', String(mergeAudio))
+  return requestFormData<{ video_data_url: string; gcs_path: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/video/upload`, fd,
+  )
+}
 
 export const adminSceneReferenceImage = (
   orderId: string,
