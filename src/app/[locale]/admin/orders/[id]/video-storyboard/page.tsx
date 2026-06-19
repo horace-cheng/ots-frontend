@@ -729,14 +729,22 @@ export default function VideoStoryboardPage() {
 
                   {isExpanded && (
                     <div className="px-3 pb-3 space-y-3">
-                      {/* Narration */}
-                      <div>
-                        <label className="text-xs text-mist block mb-1">台語旁白</label>
-                        <textarea value={scene.tracks?.['tai-lo']?.narration_text ?? (scene.narration_text ?? '')}
-                          ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}}
-                          onChange={e => { updateScene(chapter.chapter_index, sIdx, 'narration_text', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                          dir="auto"
-                          className="w-full rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden" />
+                      {/* Narration — zh reference + tai-lo editable */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-mist block mb-1">華語旁白 (參考)</label>
+                          <div className="w-full rounded bg-[#1e293b]/50 border border-white/5 text-paper/70 text-sm px-3 py-2 min-h-[38px] whitespace-pre-wrap">
+                            {scene.tracks?.zh?.narration_text || scene.narration_text || ''}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-mist block mb-1">台語旁白</label>
+                          <textarea value={scene.tracks?.['tai-lo']?.narration_text ?? ''}
+                            ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}}
+                            onChange={e => { updateScene(chapter.chapter_index, sIdx, 'narration_text', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                            dir="auto"
+                            className="w-full rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden" />
+                        </div>
                       </div>
 
                       {/* Visual prompt */}
