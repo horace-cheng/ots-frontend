@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetVideoMaterials, adminSaveVideoMaterials,
-  adminSceneTts, adminSceneRetranslate, adminSceneVideo, adminSceneReferenceImage,
+  adminSceneTts, adminSceneRetranslate, adminSceneVideo, adminGetSceneVideoTask,
+  adminSceneReferenceImage,
   adminChapterAssemble, adminChapterMerge, adminSceneRegeneratePrompt,
   adminGenerateStoryboard, adminCleanVideoAssets,
   VideoMaterials, VideoChapter, VideoScene,
@@ -116,6 +117,13 @@ export default function VideoStoryboardPage() {
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([])
 
   const [cleanModal, setCleanModal] = useState<{ show: boolean; backingUp: boolean; removeMaterials: boolean }>({ show: false, backingUp: true, removeMaterials: false })
+  const videoPollRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (videoPollRef.current !== null) clearInterval(videoPollRef.current)
+    }
+  }, [])
 
   const assetKey = (ch: number, sc: number, track: Track) => `${ch}_${sc}_${track}`
 
@@ -323,11 +331,35 @@ export default function VideoStoryboardPage() {
     const key = assetKey(chIdx, sIdx, track)
     if (!materials) return
 
+    if (videoPollRef.current !== null) {
+      clearInterval(videoPollRef.current)
+      videoPollRef.current = null
+    }
     setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'loading', videoUrl: prev[key]?.videoUrl || '' } }))
     setMessage('')
     try {
       const r = await adminSceneVideo(id, chIdx, sIdx, track)
-      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoUrl: r.video_data_url, videoState: 'done' as AssetState } }))
+      const taskId = r.task_id
+
+      const poll = async () => {
+        try {
+          const task = await adminGetSceneVideoTask(id, taskId)
+          if (task.status === 'done') {
+            if (videoPollRef.current !== null) { clearInterval(videoPollRef.current); videoPollRef.current = null }
+            setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoUrl: task.video_data_url!, videoState: 'done' as AssetState } }))
+          } else if (task.status === 'error') {
+            if (videoPollRef.current !== null) { clearInterval(videoPollRef.current); videoPollRef.current = null }
+            setMessage(`場景影片生成失敗：${task.error}`)
+            setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'error' as AssetState } }))
+          }
+        } catch {
+          if (videoPollRef.current !== null) { clearInterval(videoPollRef.current); videoPollRef.current = null }
+          setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'error' as AssetState } }))
+        }
+      }
+
+      videoPollRef.current = window.setInterval(poll, 3000)
+      poll()
     } catch (e: unknown) {
       setMessage(`場景影片生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'error' as AssetState } }))

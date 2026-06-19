@@ -239,9 +239,17 @@ export const adminSceneVideo = (
   scene_index: number,
   language?: string,
 ) =>
-  request<{ video_data_url: string; gcs_path: string; duration_sec: number }>(
+  request<{ task_id: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/scene/video`,
     { chapter_index, scene_index, language }
+  )
+
+export const adminGetSceneVideoTask = (
+  orderId: string,
+  taskId: string,
+) =>
+  request<{ status: string; video_data_url?: string; gcs_path?: string; duration_sec?: number; error?: string }>(
+    'GET', `/admin/orders/${orderId}/video-materials/scene/video-task/${taskId}`
   )
 
 export const adminSceneReferenceImage = (
