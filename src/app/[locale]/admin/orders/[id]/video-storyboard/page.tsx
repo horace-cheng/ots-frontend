@@ -310,18 +310,18 @@ export default function VideoStoryboardPage() {
     try {
       for (const t of (['zh', 'tai-lo'] as Track[])) {
         const k = assetKey(chIdx, sIdx, t)
-        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, imageState: 'loading' as AssetState } }))
+        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, ...prev[k], imageState: 'loading' as AssetState } }))
       }
       const r = await adminSceneReferenceImage(id, chIdx, sIdx)
       for (const t of (['zh', 'tai-lo'] as Track[])) {
         const k = assetKey(chIdx, sIdx, t)
-        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
+        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, ...prev[k], imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
       }
       setMessage('參考圖片已產生')
     } catch (e: unknown) {
       for (const t of (['zh', 'tai-lo'] as Track[])) {
         const k = assetKey(chIdx, sIdx, t)
-        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, imageState: 'error' as AssetState } }))
+        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, ...prev[k], imageState: 'error' as AssetState } }))
       }
       setMessage(`參考圖片產生失敗：${e instanceof Error ? e.message : 'unknown'}`)
     }
