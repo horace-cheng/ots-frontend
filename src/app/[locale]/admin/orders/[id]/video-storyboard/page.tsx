@@ -602,10 +602,26 @@ export default function VideoStoryboardPage() {
         <div className="rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4">
           {/* Chapter header with video button */}
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="text-base font-semibold text-paper">
-              Chapter {chapter.chapter_index + 1}: {chapter.title}
-              <span className="text-xs text-mist font-normal ml-2">({chapter.scenes.length} 場景)</span>
-            </h2>
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold text-paper shrink-0">Chapter {chapter.chapter_index + 1}</span>
+                <input value={chapter.title}
+                  onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title: e.target.value } : ch) } : prev)}
+                  className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-2 py-1 focus:outline-none focus:border-gold"
+                  placeholder="English title" />
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <input value={chapter.title_tai_lo ?? ''}
+                  onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title_tai_lo: e.target.value } : ch) } : prev)}
+                  className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper/80 text-xs px-2 py-1 focus:outline-none focus:border-gold"
+                  placeholder="台語標題 (optional)" />
+                <input value={chapter.title_zh ?? ''}
+                  onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title_zh: e.target.value } : ch) } : prev)}
+                  className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper/80 text-xs px-2 py-1 focus:outline-none focus:border-gold"
+                  placeholder="華語標題 (optional)" />
+              </div>
+              <span className="text-xs text-mist">{chapter.scenes.length} 場景</span>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleChapterTts(chapter.chapter_index, 'tai-lo')}

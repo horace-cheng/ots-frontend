@@ -888,6 +888,8 @@ export interface VideoScene {
 export interface VideoChapter {
   chapter_index: number
   title:         string
+  title_zh?:    string
+  title_tai_lo?: string
   scenes:        VideoScene[]
 }
 
