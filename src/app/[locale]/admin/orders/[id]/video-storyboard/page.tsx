@@ -110,6 +110,7 @@ export default function VideoStoryboardPage() {
   const [batchLoading, setBatchLoading] = useState<Record<string, boolean>>({})
   const [videoViewerChapter, setVideoViewerChapter] = useState<{ chIdx: number; track: Track } | null>(null)
   const [sceneVideoPreview, setSceneVideoPreview] = useState<{ videoUrl: string; track: Track } | null>(null)
+  const [referenceImagePreview, setReferenceImagePreview] = useState<string | null>(null)
   const [srtEditorOpen, setSrtEditorOpen] = useState(false)
   const [srtEditorChapter, setSrtEditorChapter] = useState<{ chIdx: number; track: Track } | null>(null)
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([])
@@ -818,7 +819,7 @@ export default function VideoStoryboardPage() {
                                   {i.imageState === 'loading' ? '⏳' : i.imageUrl ? `🖼 重新參考` : `🖼 參考圖片`}
                                 </button>
                                 {i.imageUrl && (
-                                  <button onClick={() => setSceneVideoPreview({ videoUrl: i.imageUrl, track: t })}
+                                  <button onClick={() => setReferenceImagePreview(i.imageUrl)}
                                     className="w-7 h-7 rounded-full bg-white/10 text-paper border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors text-xs"
                                     title="預覽參考圖片">👁</button>
                                 )}
@@ -900,6 +901,23 @@ export default function VideoStoryboardPage() {
           </div>
         ) : null
       })()}
+
+      {/* Reference image preview modal */}
+      {referenceImagePreview !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setReferenceImagePreview(null)}>
+          <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setReferenceImagePreview(null)}
+              className="absolute -top-8 right-0 text-white/70 hover:text-white text-sm">
+              關閉 ✕
+            </button>
+            <div className="mb-2">
+              <span className="text-xs text-mist">參考圖片</span>
+            </div>
+            <img src={referenceImagePreview} className="w-full rounded-lg shadow-2xl" alt="Reference" />
+          </div>
+        </div>
+      )}
 
       {/* Scene video preview modal */}
       {sceneVideoPreview !== null && (
