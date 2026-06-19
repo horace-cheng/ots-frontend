@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetVideoMaterials, adminSaveVideoMaterials,
-  adminSceneTts, adminSceneRetranslate, adminSceneVideo,
+  adminSceneTts, adminSceneRetranslate, adminSceneVideo, adminSceneReferenceImage,
   adminChapterAssemble, adminChapterMerge, adminSceneRegeneratePrompt,
   adminGenerateStoryboard, adminCleanVideoAssets,
   VideoMaterials, VideoChapter, VideoScene,
@@ -271,7 +271,7 @@ export default function VideoStoryboardPage() {
       })
       // Clear stale Tai-lo audio asset
       const taiLoKey = assetKey(chIdx, sIdx, 'tai-lo')
-      setSceneAssets(prev => ({ ...prev, [taiLoKey]: { audioUrl: '', imageUrl: prev[taiLoKey]?.imageUrl || '', audioState: 'idle', imageState: prev[taiLoKey]?.imageState || 'idle' } }))
+      setSceneAssets(prev => ({ ...prev, [taiLoKey]: { audioUrl: '', imageUrl: prev[taiLoKey]?.imageUrl || '', videoUrl: '', audioState: 'idle', imageState: prev[taiLoKey]?.imageState || 'idle', videoState: 'idle', audioDuration: 0 } }))
       setMessage('台語翻譯完成')
     } catch (e: unknown) {
       setMessage(`台語翻譯失敗：${e instanceof Error ? e.message : 'unknown'}`)
@@ -296,19 +296,24 @@ export default function VideoStoryboardPage() {
 
   const handleSceneReferenceImage = useCallback(async (chIdx: number, sIdx: number) => {
     if (!materials) return
-    const key = `${chIdx}_${sIdx}`
-    // Update both tracks' imageState
-    const updateState = (k: string) => setSceneAssets(prev => ({ ...prev, [k]: { ...prev[k], imageState: 'loading', imageUrl: prev[k]?.imageUrl || '' } }))
-    for (const t of (['zh', 'tai-lo'] as Track[])) updateState(assetKey(chIdx, sIdx, t))
+    const blank = { audioUrl: '', imageUrl: '', videoUrl: '', audioState: 'idle' as AssetState, imageState: 'idle' as AssetState, videoState: 'idle' as AssetState, audioDuration: 0 }
     setMessage('')
     try {
+      for (const t of (['zh', 'tai-lo'] as Track[])) {
+        const k = assetKey(chIdx, sIdx, t)
+        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, imageState: 'loading' as AssetState } }))
+      }
       const r = await adminSceneReferenceImage(id, chIdx, sIdx)
-      const setDone = (k: string) => setSceneAssets(prev => ({ ...prev, [k]: { ...prev[k], imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
-      for (const t of (['zh', 'tai-lo'] as Track[])) setDone(assetKey(chIdx, sIdx, t))
+      for (const t of (['zh', 'tai-lo'] as Track[])) {
+        const k = assetKey(chIdx, sIdx, t)
+        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
+      }
       setMessage('參考圖片已產生')
     } catch (e: unknown) {
-      const setErr = (k: string) => setSceneAssets(prev => ({ ...prev, [k]: { ...prev[k], imageState: 'error' as AssetState } }))
-      for (const t of (['zh', 'tai-lo'] as Track[])) setErr(assetKey(chIdx, sIdx, t))
+      for (const t of (['zh', 'tai-lo'] as Track[])) {
+        const k = assetKey(chIdx, sIdx, t)
+        setSceneAssets(prev => ({ ...prev, [k]: { ...blank, imageState: 'error' as AssetState } }))
+      }
       setMessage(`參考圖片產生失敗：${e instanceof Error ? e.message : 'unknown'}`)
     }
   }, [materials, id])
@@ -446,11 +451,16 @@ export default function VideoStoryboardPage() {
                   }
                   const parsed: SceneAssets = {}
                   for (const [k, v] of Object.entries(r.scene_assets || {})) {
+                    const audioUrl = (v as any).audio_url || ''
+                    const refUrl = (v as any).reference_image_url || ''
                     parsed[k] = {
-                      audioUrl: v.audio_url || '',
-                      imageUrl: v.image_url || '',
-                      audioState: v.audio_url ? 'done' as AssetState : 'idle' as AssetState,
-                      imageState: v.image_url ? 'done' as AssetState : 'idle' as AssetState,
+                      audioUrl,
+                      imageUrl: refUrl || (v as any).image_url || '',
+                      videoUrl: (v as any).video_url || '',
+                      audioState: audioUrl ? 'done' as AssetState : 'idle' as AssetState,
+                      imageState: refUrl ? 'done' as AssetState : 'idle' as AssetState,
+                      videoState: (v as any).video_url ? 'done' as AssetState : 'idle' as AssetState,
+                      audioDuration: (v as any).audio_duration || 0,
                     }
                   }
                   setSceneAssets(parsed)
@@ -968,11 +978,16 @@ export default function VideoStoryboardPage() {
                     setMaterials(r.materials)
                     const parsed: SceneAssets = {}
                     for (const [k, v] of Object.entries(r.scene_assets || {})) {
+                      const audioUrl = (v as any).audio_url || ''
+                      const refUrl = (v as any).reference_image_url || ''
                       parsed[k] = {
-                        audioUrl: v.audio_url || '',
-                        imageUrl: v.image_url || '',
-                        audioState: v.audio_url ? 'done' as AssetState : 'idle' as AssetState,
-                        imageState: v.image_url ? 'done' as AssetState : 'idle' as AssetState,
+                        audioUrl,
+                        imageUrl: refUrl || (v as any).image_url || '',
+                        videoUrl: (v as any).video_url || '',
+                        audioState: audioUrl ? 'done' as AssetState : 'idle' as AssetState,
+                        imageState: refUrl ? 'done' as AssetState : 'idle' as AssetState,
+                        videoState: (v as any).video_url ? 'done' as AssetState : 'idle' as AssetState,
+                        audioDuration: (v as any).audio_duration || 0,
                       }
                     }
                     setSceneAssets(parsed)
