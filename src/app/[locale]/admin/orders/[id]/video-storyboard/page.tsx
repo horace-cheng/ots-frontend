@@ -603,12 +603,8 @@ export default function VideoStoryboardPage() {
           {/* Chapter header with video button */}
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex flex-col gap-1.5 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-base font-semibold text-paper shrink-0">Chapter {chapter.chapter_index + 1}</span>
-                <input value={chapter.title}
-                  onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title: e.target.value } : ch) } : prev)}
-                  className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-2 py-1 focus:outline-none focus:border-gold"
-                  placeholder="English title" />
+              <div className="text-base font-semibold text-paper">
+                Chapter {chapter.chapter_index + 1}: {chapter.title}
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <input value={chapter.title_tai_lo ?? ''}
