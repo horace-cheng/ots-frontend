@@ -864,6 +864,7 @@ export interface VideoMaterials {
     voice_id_tai_lo?:     string
     short_pause_duration?: number
     long_pause_duration?:  number
+    visual_style?:        string
   }
 }
 

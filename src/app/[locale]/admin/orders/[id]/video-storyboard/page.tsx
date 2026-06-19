@@ -536,8 +536,23 @@ export default function VideoStoryboardPage() {
 
       {/* Settings */}
       {showSettings && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <h2 className="text-sm font-semibold text-paper mb-3">語音設定</h2>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
+          <h2 className="text-sm font-semibold text-paper">視覺風格</h2>
+          <div>
+            <label className="text-xs text-mist block mb-1">影片風格</label>
+            <select value={(materials.settings as any).visual_style || 'photorealistic'}
+              onChange={e => setMaterials(prev => prev ? { ...prev, settings: { ...prev.settings, visual_style: e.target.value } } : prev)}
+              className="rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold">
+              <option value="photorealistic">寫實 (Photorealistic)</option>
+              <option value="cinematic">電影 (Cinematic)</option>
+              <option value="anime">動畫 (Anime)</option>
+              <option value="3d_render">3D 渲染 (3D Render)</option>
+              <option value="comic">漫畫 (Comic)</option>
+              <option value="watercolor">水彩 (Watercolor)</option>
+              <option value="oil_painting">油畫 (Oil Painting)</option>
+            </select>
+          </div>
+          <h2 className="text-sm font-semibold text-paper">語音設定</h2>
           <div className="flex flex-col gap-4">
             {(['zh', 'tai-lo'] as Track[]).map(t => (
               <div key={t} className="flex flex-wrap gap-4 items-end">
