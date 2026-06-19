@@ -880,7 +880,7 @@ export interface VideoScene {
   visual_prompt:  string
   duration_est:   string
   tracks?: {
-    zh:     VideoSceneTrack
+    zh?:     VideoSceneTrack
     "tai-lo": VideoSceneTrack
   }
 }
