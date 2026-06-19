@@ -607,14 +607,14 @@ export default function VideoStoryboardPage() {
                 Chapter {chapter.chapter_index + 1}: {chapter.title}
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <input value={chapter.title_tai_lo ?? ''}
-                  onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title_tai_lo: e.target.value } : ch) } : prev)}
-                  className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper/80 text-xs px-2 py-1 focus:outline-none focus:border-gold"
-                  placeholder="台語標題 (optional)" />
                 <input value={chapter.title_zh ?? ''}
                   onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title_zh: e.target.value } : ch) } : prev)}
                   className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper/80 text-xs px-2 py-1 focus:outline-none focus:border-gold"
                   placeholder="華語標題 (optional)" />
+                <input value={chapter.title_tai_lo ?? ''}
+                  onChange={e => setMaterials(prev => prev ? { ...prev, chapters: prev.chapters.map((ch, ci) => ci === activeChapter ? { ...ch, title_tai_lo: e.target.value } : ch) } : prev)}
+                  className="flex-1 min-w-0 rounded bg-[#1e293b] border border-white/10 text-paper/80 text-xs px-2 py-1 focus:outline-none focus:border-gold"
+                  placeholder="台語標題 (optional)" />
               </div>
               <span className="text-xs text-mist">{chapter.scenes.length} 場景</span>
             </div>
