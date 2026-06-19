@@ -443,7 +443,7 @@ export default function VideoStoryboardPage() {
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioState: 'loading', audioUrl: prev[key]?.audioUrl || '' } }))
       try {
         const r = await adminSceneTts(id, chIdx, sIdx, text, vs.voiceId, vs.speakingRate, track, vs.shortPause, vs.longPause)
-        setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioUrl: r.audio_data_url, audioState: 'done' as AssetState } }))
+        setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioUrl: r.audio_data_url, audioDuration: r.duration_sec, audioState: 'done' as AssetState } }))
       } catch {
         setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioState: 'error' as AssetState } }))
       }
