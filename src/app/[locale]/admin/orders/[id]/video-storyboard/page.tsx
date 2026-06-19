@@ -1012,7 +1012,7 @@ export default function VideoStoryboardPage() {
             <div className="mb-2">
               <span className="text-xs text-mist">{TRACK_LABELS[sceneVideoPreview.track]} 場景影片</span>
             </div>
-            <video controls autoPlay className="w-full rounded-lg shadow-2xl"
+            <video key={sceneVideoPreview.videoUrl} controls autoPlay className="w-full rounded-lg shadow-2xl"
               src={sceneVideoPreview.videoUrl} />
           </div>
         </div>
