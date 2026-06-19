@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   adminGetVideoMaterials, adminSaveVideoMaterials,
-  adminSceneTts, adminSceneImage, adminSceneRetranslate, adminChapterAssemble,
+  adminSceneTts, adminSceneRetranslate, adminSceneVideo,
+  adminChapterAssemble, adminChapterMerge, adminSceneRegeneratePrompt,
   adminGenerateStoryboard, adminCleanVideoAssets,
   VideoMaterials, VideoChapter, VideoScene,
 } from '@/lib/api'
@@ -20,8 +21,11 @@ const TRACK_LABELS: Record<Track, string> = {
 type SceneAssets = Record<string, {
   audioUrl: string
   imageUrl: string
+  videoUrl: string
   audioState: AssetState
   imageState: AssetState
+  videoState: AssetState
+  audioDuration: number
 }>
 
 const TRACK_DEFAULT_VOICES: Record<Track, string> = {
@@ -105,10 +109,11 @@ export default function VideoStoryboardPage() {
   const [skipExisting, setSkipExisting] = useState(true)
   const [batchLoading, setBatchLoading] = useState<Record<string, boolean>>({})
   const [videoViewerChapter, setVideoViewerChapter] = useState<{ chIdx: number; track: Track } | null>(null)
+  const [sceneVideoPreview, setSceneVideoPreview] = useState<{ videoUrl: string; track: Track } | null>(null)
   const [srtEditorOpen, setSrtEditorOpen] = useState(false)
   const [srtEditorChapter, setSrtEditorChapter] = useState<{ chIdx: number; track: Track } | null>(null)
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([])
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
+
   const [cleanModal, setCleanModal] = useState<{ show: boolean; backingUp: boolean; removeMaterials: boolean }>({ show: false, backingUp: true, removeMaterials: false })
 
   const assetKey = (ch: number, sc: number, track: Track) => `${ch}_${sc}_${track}`
@@ -141,13 +146,16 @@ export default function VideoStoryboardPage() {
       if (r.scene_assets) {
         const parsed: SceneAssets = {}
         for (const [k, v] of Object.entries(r.scene_assets)) {
-          const audioUrl = v.audio_url || ''
-          const imageUrl = v.image_url || ''
+          const audioUrl = (v as any).audio_url || ''
+          const imageUrl = (v as any).image_url || ''
           parsed[k] = {
             audioUrl,
             imageUrl,
+            videoUrl: (v as any).video_url || '',
             audioState: audioUrl ? ('done' as AssetState) : ('idle' as AssetState),
             imageState: imageUrl ? ('done' as AssetState) : ('idle' as AssetState),
+            videoState: (v as any).video_url ? ('done' as AssetState) : ('idle' as AssetState),
+            audioDuration: (v as any).audio_duration || 0,
           }
         }
         setSceneAssets(parsed)
@@ -231,29 +239,12 @@ export default function VideoStoryboardPage() {
     try {
       const vs = voiceSettings[track]
       const r = await adminSceneTts(id, chIdx, sIdx, text, vs.voiceId, vs.speakingRate, track, vs.shortPause, vs.longPause)
-      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioUrl: r.audio_data_url, audioState: 'done' as AssetState } }))
+      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioUrl: r.audio_data_url, audioDuration: r.duration_sec, audioState: 'done' as AssetState } }))
     } catch (e: unknown) {
       setMessage(`TTS 生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
       setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], audioState: 'error' as AssetState } }))
     }
   }, [materials, id, voiceSettings])
-
-  const handleSceneImage = useCallback(async (chIdx: number, sIdx: number) => {
-    const key = `${chIdx}_${sIdx}_zh`
-    if (!materials) return
-    const prompt = materials.chapters[chIdx].scenes[sIdx]?.visual_prompt
-    if (!prompt) { setMessage('視覺提示為空'); return }
-
-    setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageState: 'loading', imageUrl: prev[key]?.imageUrl || '' } }))
-    setMessage('')
-    try {
-      const r = await adminSceneImage(id, chIdx, sIdx, prompt)
-      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
-    } catch (e: unknown) {
-      setMessage(`圖片生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
-      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageState: 'error' as AssetState } }))
-    }
-  }, [materials, id])
 
   const handleSceneRetranslate = useCallback(async (chIdx: number, sIdx: number) => {
     if (!materials) return
@@ -303,6 +294,57 @@ export default function VideoStoryboardPage() {
     }
   }, [id])
 
+  const handleSceneVideo = useCallback(async (chIdx: number, sIdx: number, track: Track) => {
+    const key = assetKey(chIdx, sIdx, track)
+    if (!materials) return
+
+    setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'loading', videoUrl: prev[key]?.videoUrl || '' } }))
+    setMessage('')
+    try {
+      const r = await adminSceneVideo(id, chIdx, sIdx, track)
+      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoUrl: r.video_data_url, videoState: 'done' as AssetState } }))
+    } catch (e: unknown) {
+      setMessage(`場景影片生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
+      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], videoState: 'error' as AssetState } }))
+    }
+  }, [materials, id])
+
+  const handleChapterMerge = useCallback(async (chIdx: number, track: Track) => {
+    const chKey = `${chIdx}_${track}`
+    setChapterVideoState(prev => ({ ...prev, [chKey]: 'loading' }))
+    setMessage('')
+    try {
+      const r = await adminChapterMerge(id, chIdx, track)
+      setChapterVideoUrls(prev => ({ ...prev, [chKey]: r.video_url }))
+      const srtUrl = r.srt_url
+      if (srtUrl) setChapterSrtUrls(prev => ({ ...prev, [chKey]: srtUrl }))
+      setChapterVideoState(prev => ({ ...prev, [chKey]: 'done' }))
+    } catch (e: unknown) {
+      setMessage(`章節影片合併失敗：${e instanceof Error ? e.message : 'unknown'}`)
+      setChapterVideoState(prev => ({ ...prev, [chKey]: 'error' }))
+    }
+  }, [id])
+
+  const handleSceneRegeneratePrompt = useCallback(async (chIdx: number, sIdx: number) => {
+    if (!materials) return
+    setMessage('')
+    try {
+      const r = await adminSceneRegeneratePrompt(id, chIdx, sIdx)
+      setMaterials(prev => {
+        if (!prev) return prev
+        const updated = { ...prev, chapters: [...prev.chapters] }
+        const ch = { ...updated.chapters[chIdx] }
+        ch.scenes = [...ch.scenes]
+        ch.scenes[sIdx] = { ...ch.scenes[sIdx], visual_prompt: r.visual_prompt }
+        updated.chapters[chIdx] = ch
+        return updated
+      })
+      setMessage('視覺提示已重新生成')
+    } catch (e: unknown) {
+      setMessage(`重新生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
+    }
+  }, [materials, id])
+
   const openSrtEditor = (chIdx: number, track: Track) => {
     const srtUrl = chapterSrtUrls[`${chIdx}_${track}`]
     if (!srtUrl) { setMessage('請先產生章節影片與字幕'); return }
@@ -339,31 +381,6 @@ export default function VideoStoryboardPage() {
     setBatchLoading(prev => ({ ...prev, [batchKey]: false }))
     setMessage(`章節語音（${TRACK_LABELS[track]}）全部產生完成`)
   }, [materials, id, voiceSettings, skipExisting, sceneAssets])
-
-  const handleChapterImages = useCallback(async (chIdx: number) => {
-    if (!materials) return
-    const scenes = materials.chapters[chIdx]?.scenes
-    if (!scenes?.length) return
-    const batchKey = `img_${chIdx}`
-    setBatchLoading(prev => ({ ...prev, [batchKey]: true }))
-    setMessage('')
-    for (let sIdx = 0; sIdx < scenes.length; sIdx++) {
-      const key = `${chIdx}_${sIdx}_zh`
-      const prompt = scenes[sIdx]?.visual_prompt
-      if (!prompt) continue
-      const existing = sceneAssets[key]
-      if (skipExisting && existing?.imageState === 'done') continue
-      setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageState: 'loading', imageUrl: prev[key]?.imageUrl || '' } }))
-      try {
-        const r = await adminSceneImage(id, chIdx, sIdx, prompt)
-        setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageUrl: r.image_data_url, imageState: 'done' as AssetState } }))
-      } catch {
-        setSceneAssets(prev => ({ ...prev, [key]: { ...prev[key], imageState: 'error' as AssetState } }))
-      }
-    }
-    setBatchLoading(prev => ({ ...prev, [batchKey]: false }))
-    setMessage('章節圖片全部產生完成')
-  }, [materials, id, skipExisting, sceneAssets])
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
@@ -452,7 +469,7 @@ export default function VideoStoryboardPage() {
 
   return (
     <>
-    <div className="space-y-4 fade-up p-4 sm:p-6 max-w-5xl mx-auto">
+    <div className="space-y-4 fade-up">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -591,12 +608,6 @@ export default function VideoStoryboardPage() {
                   {batchLoading[`tts_${chapter.chapter_index}_${t}`] ? '⏳' : `🔊 ${TRACK_LABELS[t]}語音`}
                 </button>
               ))}
-              <button
-                onClick={() => handleChapterImages(chapter.chapter_index)}
-                disabled={batchLoading[`img_${chapter.chapter_index}`]}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 disabled:opacity-40 transition-colors">
-                {batchLoading[`img_${chapter.chapter_index}`] ? '⏳ 圖片批次中…' : '🖼 產生全部圖片'}
-              </button>
               {(['zh', 'tai-lo'] as Track[]).map(t => {
                 const chKey = `${chapter.chapter_index}_${t}`
                 return (
@@ -613,6 +624,12 @@ export default function VideoStoryboardPage() {
                             驗證
                           </button>
                         )}
+                        <button
+                          onClick={() => handleChapterMerge(chapter.chapter_index, t)}
+                          disabled={chapterVideoState[chKey] === 'loading'}
+                          className="px-2 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors">
+                          {chapterVideoState[chKey] === 'loading' ? '⏳' : '🔗 合併'} {TRACK_LABELS[t]}
+                        </button>
                         <button
                           onClick={() => handleChapterAssemble(chapter.chapter_index, t)}
                           className="px-2 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors">
@@ -648,6 +665,20 @@ export default function VideoStoryboardPage() {
                         Scene {scene.scene_index + 1}
                       </span>
                       <span className="text-xs text-mist/60">{scene.duration_est}</span>
+                      {(['zh', 'tai-lo'] as Track[]).map(t => {
+                        const ak = assetKey(chapter.chapter_index, sIdx, t)
+                        const a = sceneAssets[ak]
+                        if (!a || !a.audioDuration) return null
+                        const label = TRACK_LABELS[t].charAt(0)
+                        const tooLong = a.audioDuration >= 15
+                        return (
+                          <span key={t}
+                            className={`text-xs ${tooLong ? 'text-red-400' : 'text-mist/50'}`}
+                            title={`${tooLong ? '⚠️ 音訊 ≥ 15s，建議縮短' : `${TRACK_LABELS[t]} TTS 長度`}`}>
+                            {label}({a.audioDuration.toFixed(1)}s)
+                          </span>
+                        )
+                      })}
                       <div className="flex items-center gap-1 ml-1">
                         {(['zh', 'tai-lo'] as Track[]).map(t => {
                           const ak = assetKey(chapter.chapter_index, sIdx, t)
@@ -655,19 +686,26 @@ export default function VideoStoryboardPage() {
                           if (!a || a.audioState === 'idle') return null
                           const label = TRACK_LABELS[t].charAt(0)
                           if (a.audioState === 'loading') return <span key={t} className="text-yellow-400 text-xs animate-pulse" title={`${TRACK_LABELS[t]} 語音生成中`}>{label}⏳</span>
-                          if (a.audioState === 'done') return <span key={t} className="text-green-400 text-xs" title={`${TRACK_LABELS[t]} 語音完成`}>{label}</span>
                           if (a.audioState === 'error') return <span key={t} className="text-red-400 text-xs" title={`${TRACK_LABELS[t]} 語音失敗`}>{label}✗</span>
                           return null
                         })}
-                        {(() => {
-                          const ik = assetKey(chapter.chapter_index, sIdx, 'zh')
-                          const img = sceneAssets[ik]
-                          if (!img || img.imageState === 'idle') return null
-                          if (img.imageState === 'loading') return <span className="text-yellow-400 text-xs animate-pulse" title="圖片生成中">🖼⏳</span>
-                          if (img.imageState === 'done') return <span className="text-green-400 text-xs" title="圖片完成">🖼</span>
-                          if (img.imageState === 'error') return <span className="text-red-400 text-xs" title="圖片失敗">🖼✗</span>
+                        {(['zh', 'tai-lo'] as Track[]).map(t => {
+                          const vk = assetKey(chapter.chapter_index, sIdx, t)
+                          const v = sceneAssets[vk]
+                          if (!v || v.videoState === 'idle') return null
+                          const label = TRACK_LABELS[t].charAt(0)
+                          if (v.videoState === 'loading') return <span key={t} className="text-yellow-400 text-xs animate-pulse" title={`${TRACK_LABELS[t]} 影片生成中`}>{label}🎬⏳</span>
+                          if (v.videoState === 'done') return (
+                            <span key={t}
+                              className="text-green-400 text-xs cursor-pointer hover:scale-110 transition-transform"
+                              title={`${TRACK_LABELS[t]} 影片完成 — 點擊預覽`}
+                              onClick={e => { e.stopPropagation(); setSceneVideoPreview({ videoUrl: v.videoUrl, track: t }) }}>
+                              {label}🎬
+                            </span>
+                          )
+                          if (v.videoState === 'error') return <span key={t} className="text-red-400 text-xs" title={`${TRACK_LABELS[t]} 影片失敗`}>{label}🎬✗</span>
                           return null
-                        })()}
+                        })}
                       </div>
                     </div>
                     <span className="text-mist/40 text-xs">{isExpanded ? '▲' : '▼'}</span>
@@ -698,10 +736,17 @@ export default function VideoStoryboardPage() {
                       {/* Visual prompt */}
                       <div>
                         <label className="text-xs text-mist block mb-1">視覺提示 (English prompt)</label>
-                        <textarea value={scene.visual_prompt}
-                          ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}}
-                          onChange={e => { updateScene(chapter.chapter_index, sIdx, 'visual_prompt', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                          className="w-full rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden font-mono text-xs" />
+                        <div className="flex gap-2">
+                          <textarea value={scene.visual_prompt}
+                            ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}}
+                            onChange={e => { updateScene(chapter.chapter_index, sIdx, 'visual_prompt', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                            className="flex-1 rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden font-mono text-xs" />
+                          <button onClick={() => handleSceneRegeneratePrompt(chapter.chapter_index, sIdx)}
+                            className="shrink-0 self-start px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors"
+                            title="用 AI 重新生成視覺提示">
+                            🔄
+                          </button>
+                        </div>
                       </div>
 
                       {/* Generation controls */}
@@ -726,34 +771,29 @@ export default function VideoStoryboardPage() {
                           )
                         })}
 
-                        {/* Image */}
-                        {(() => {
-                          const anyKey = assetKey(chapter.chapter_index, sIdx, 'zh')
-                          const img = sceneAssets[anyKey] || { audioUrl: '', imageUrl: '', audioState: 'idle', imageState: 'idle' }
-                          return (
-                            <>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleSceneImage(chapter.chapter_index, sIdx)}
-                                  disabled={img.imageState === 'loading'}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40
-                                    ${img.imageState === 'done' ? 'bg-green-900/30 text-green-300 border border-green-700/30' : 'bg-white/10 text-paper hover:bg-white/20'}`}>
-                                  {img.imageState === 'loading' ? '⏳' : img.imageUrl ? '🖼 重新生成' : '🖼 生成圖片'}
-                                </button>
-                              </div>
 
-                              {/* Image preview */}
-                              {img.imageUrl && (
-                                <div className="w-full space-y-1">
-                                  <p className="text-xs text-mist/60">圖片預覽（點擊放大）</p>
-                                  <img src={img.imageUrl} alt="Generated visual"
-                                    className="rounded border border-white/10 max-w-full max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => setPreviewImageUrl(img.imageUrl)} />
-                                </div>
+
+                        {/* Video — per track */}
+                        {(['zh', 'tai-lo'] as Track[]).map(t => {
+                          const vk = assetKey(chapter.chapter_index, sIdx, t)
+                          const v = sceneAssets[vk] || { audioUrl: '', imageUrl: '', videoUrl: '', audioState: 'idle', imageState: 'idle', videoState: 'idle', audioDuration: 0 }
+                          return (
+                            <div key={t} className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleSceneVideo(chapter.chapter_index, sIdx, t)}
+                                disabled={v.videoState === 'loading'}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40
+                                  ${v.videoState === 'done' ? 'bg-green-900/30 text-green-300 border border-green-700/30' : 'bg-white/10 text-paper hover:bg-white/20'}`}>
+                                {v.videoState === 'loading' ? '⏳' : v.videoUrl ? `🎬 ${TRACK_LABELS[t]} 重新` : `🎬 ${TRACK_LABELS[t]} 影片`}
+                              </button>
+                              {v.videoUrl && (
+                                <button onClick={() => setSceneVideoPreview({ videoUrl: v.videoUrl, track: t })}
+                                  className="w-7 h-7 rounded-full bg-green-900/40 text-green-300 border border-green-700/30 flex items-center justify-center hover:bg-green-800/40 transition-colors text-xs"
+                                  title="預覽場景影片">▶</button>
                               )}
-                            </>
+                            </div>
                           )
-                        })()}
+                        })}
                       </div>
                     </div>
                   )}
@@ -805,17 +845,20 @@ export default function VideoStoryboardPage() {
         ) : null
       })()}
 
-      {/* Image preview modal */}
-      {previewImageUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setPreviewImageUrl(null)}>
-          <div className="relative max-w-5xl w-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setPreviewImageUrl(null)}
-              className="self-end mb-2 text-white/70 hover:text-white text-sm">
+      {/* Scene video preview modal */}
+      {sceneVideoPreview !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setSceneVideoPreview(null)}>
+          <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSceneVideoPreview(null)}
+              className="absolute -top-8 right-0 text-white/70 hover:text-white text-sm">
               關閉 ✕
             </button>
-            <img src={previewImageUrl} alt="Preview"
-              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
+            <div className="mb-2">
+              <span className="text-xs text-mist">{TRACK_LABELS[sceneVideoPreview.track]} 場景影片</span>
+            </div>
+            <video controls autoPlay className="w-full rounded-lg shadow-2xl"
+              src={sceneVideoPreview.videoUrl} />
           </div>
         </div>
       )}

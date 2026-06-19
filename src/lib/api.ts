@@ -211,7 +211,7 @@ export const adminSceneTts = (
   short_pause_duration?: number,
   long_pause_duration?: number,
 ) =>
-  request<{ audio_data_url: string; gcs_path: string }>(
+  request<{ audio_data_url: string; gcs_path: string; duration_sec: number }>(
     'POST', `/admin/orders/${orderId}/video-materials/scene/tts`,
     { chapter_index, scene_index, text, voice_id, speaking_rate, language, short_pause_duration, long_pause_duration }
   )
@@ -231,6 +231,38 @@ export const adminSceneRetranslate = (orderId: string, chapter_index: number, sc
   request<{ tai_lo_text: string }>(
     'POST', `/admin/orders/${orderId}/video-materials/scene/retranslate`,
     { chapter_index, scene_index }
+  )
+
+export const adminSceneVideo = (
+  orderId: string,
+  chapter_index: number,
+  scene_index: number,
+  language?: string,
+) =>
+  request<{ video_data_url: string; gcs_path: string; duration_sec: number }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/video`,
+    { chapter_index, scene_index, language }
+  )
+
+export const adminChapterMerge = (
+  orderId: string,
+  chapter_index: number,
+  language?: string,
+) =>
+  request<{ video_url: string; srt_url: string | null; gcs_path: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/chapter/merge`,
+    { chapter_index, language }
+  )
+
+export const adminSceneRegeneratePrompt = (
+  orderId: string,
+  chapter_index: number,
+  scene_index: number,
+  instruction?: string,
+) =>
+  request<{ visual_prompt: string }>(
+    'POST', `/admin/orders/${orderId}/video-materials/scene/regenerate-prompt`,
+    { chapter_index, scene_index, instruction }
   )
 
 export const adminChapterAssemble = (
