@@ -9,6 +9,7 @@ import {
   adminSceneReferenceImage, adminSceneVideoUpload,
   adminChapterAssemble, adminSceneRegeneratePrompt,
   adminGenerateStoryboard, adminCleanVideoAssets,
+  refreshSignedUrl,
   VideoMaterials, VideoChapter, VideoScene,
 } from '@/lib/api'
 
@@ -106,12 +107,14 @@ export default function VideoStoryboardPage() {
   const [expandedScenes, setExpandedScenes] = useState<Record<string, boolean>>({})
   const [skipExisting, setSkipExisting] = useState(true)
   const [batchLoading, setBatchLoading] = useState<Record<string, boolean>>({})
-  const [videoViewerChapter, setVideoViewerChapter] = useState<{ chIdx: number; track: Track } | null>(null)
+  const [videoViewerChapter, setVideoViewerChapter] = useState<{ chIdx: number; track: Track; videoUrl: string; srtUrl: string } | null>(null)
   const [sceneVideoPreview, setSceneVideoPreview] = useState<{ videoUrl: string; track: Track } | null>(null)
   const [referenceImagePreview, setReferenceImagePreview] = useState<string | null>(null)
   const [srtEditorOpen, setSrtEditorOpen] = useState(false)
   const [srtEditorChapter, setSrtEditorChapter] = useState<{ chIdx: number; track: Track } | null>(null)
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([])
+  const [scenePromptSettings, setScenePromptSettings] = useState<Record<string, { hint: string; cameraDistance: string; cameraAngle: string }>>({})
+  const [regenerateModal, setRegenerateModal] = useState<{ chIdx: number; sIdx: number } | null>(null)
 
   const [cleanModal, setCleanModal] = useState<{ show: boolean; backingUp: boolean; removeMaterials: boolean }>({ show: false, backingUp: true, removeMaterials: false })
   const videoPollRef = useRef<number | null>(null)
@@ -123,6 +126,19 @@ export default function VideoStoryboardPage() {
   }, [])
 
   const assetKey = (ch: number, sc: number, track: Track) => `${ch}_${sc}_${track}`
+
+  const sceneAssetId = (scene: VideoScene, chIdx: number, sIdx: number) =>
+    scene.scene_id || `${chIdx}_${sIdx}`
+  const sceneAudioPath = (scene: VideoScene, chIdx: number, sIdx: number, track: Track) =>
+    `pipeline/${id}/scenes/${sceneAssetId(scene, chIdx, sIdx)}/${track}/narration.wav`
+  const sceneVideoPath = (scene: VideoScene, chIdx: number, sIdx: number, track: Track) =>
+    `pipeline/${id}/scenes/${sceneAssetId(scene, chIdx, sIdx)}/${track}/scene_video.mp4`
+  const sceneRefImagePath = (scene: VideoScene, chIdx: number, sIdx: number) =>
+    `pipeline/${id}/scenes/${sceneAssetId(scene, chIdx, sIdx)}/reference.jpg`
+  const chapterVideoPath = (chIdx: number, track: Track) =>
+    `orders/${id}/chapter_${String(chIdx).padStart(2, '0')}_${track}.mp4`
+  const chapterSrtPath = (chIdx: number, track: Track) =>
+    `orders/${id}/chapter_${String(chIdx).padStart(2, '0')}_${track}.srt`
 
   useEffect(() => {
     adminGetVideoMaterials(id).then(r => {
@@ -400,25 +416,7 @@ export default function VideoStoryboardPage() {
     }
   }, [id])
 
-  const handleSceneRegeneratePrompt = useCallback(async (chIdx: number, sIdx: number) => {
-    if (!materials) return
-    setMessage('')
-    try {
-      const r = await adminSceneRegeneratePrompt(id, chIdx, sIdx)
-      setMaterials(prev => {
-        if (!prev) return prev
-        const updated = { ...prev, chapters: [...prev.chapters] }
-        const ch = { ...updated.chapters[chIdx] }
-        ch.scenes = [...ch.scenes]
-        ch.scenes[sIdx] = { ...ch.scenes[sIdx], visual_prompt: r.visual_prompt }
-        updated.chapters[chIdx] = ch
-        return updated
-      })
-      setMessage('視覺提示已重新生成')
-    } catch (e: unknown) {
-      setMessage(`重新生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
-    }
-  }, [materials, id])
+
 
   const openSrtEditor = (chIdx: number, track: Track) => {
     const srtUrl = chapterSrtUrls[`${chIdx}_${track}`]
@@ -657,7 +655,18 @@ export default function VideoStoryboardPage() {
                   : 'bg-white/5 text-mist border border-white/10 hover:bg-white/10'}`}>
               {ci + 1}. {ch.title}
               {chapterVideoState[ck] === 'done' && url && (
-                <span onClick={e => { e.stopPropagation(); setVideoViewerChapter({ chIdx: ch.chapter_index, track: 'tai-lo' }) }}
+                <span onClick={async (e) => {
+                  e.stopPropagation()
+                  try {
+                    const vPath = chapterVideoPath(ch.chapter_index, 'tai-lo')
+                    const sPath = chapterSrtPath(ch.chapter_index, 'tai-lo')
+                    const [vr, sr] = await Promise.all([
+                      refreshSignedUrl(id, vPath),
+                      refreshSignedUrl(id, sPath).catch(() => ({ url: '' })),
+                    ])
+                    setVideoViewerChapter({ chIdx: ch.chapter_index, track: 'tai-lo', videoUrl: vr.url, srtUrl: sr.url })
+                  } catch {}
+                }}
                   className="text-green-400 cursor-pointer hover:scale-110 transition-transform" title="觀看影片">▶</span>
               )}
               {chapterVideoState[ck] === 'loading' && (
@@ -708,7 +717,17 @@ export default function VideoStoryboardPage() {
                     {hasVideo && (
                       <>
                         <button
-                          onClick={() => setVideoViewerChapter({ chIdx: chapter.chapter_index, track: 'tai-lo' })}
+                          onClick={async () => {
+                            try {
+                              const vPath = chapterVideoPath(chapter.chapter_index, 'tai-lo')
+                              const sPath = chapterSrtPath(chapter.chapter_index, 'tai-lo')
+                              const [vr, sr] = await Promise.all([
+                                refreshSignedUrl(id, vPath),
+                                refreshSignedUrl(id, sPath).catch(() => ({ url: '' })),
+                              ])
+                              setVideoViewerChapter({ chIdx: chapter.chapter_index, track: 'tai-lo', videoUrl: vr.url, srtUrl: sr.url })
+                            } catch {}
+                          }}
                           className="w-8 h-8 rounded-lg bg-green-900/40 text-green-300 border border-green-700/30 flex items-center justify-center hover:bg-green-800/40 transition-colors text-sm"
                           title="觀看影片">▶</button>
                         {chapterSrtUrls[chKey] && (
@@ -749,7 +768,7 @@ export default function VideoStoryboardPage() {
                       <button onClick={e => { e.stopPropagation(); removeScene(chapter.chapter_index, sIdx) }}
                         className="text-mist/20 hover:text-red-400 transition-colors text-xs leading-none pr-1"
                         title="刪除場景">🗑</button>
-                      <span className="text-xs font-medium text-mist">
+                      <span className="inline-block w-[10ch] text-xs font-medium text-mist whitespace-nowrap">
                         Scene {scene.scene_index + 1}
                       </span>
                       {(() => {
@@ -758,7 +777,7 @@ export default function VideoStoryboardPage() {
                         if (!a || !a.audioDuration) return null
                         const tooLong = a.audioDuration >= 15
                         return (
-                          <span className={`text-xs ${tooLong ? 'text-red-400' : 'text-mist/50'}`}
+                          <span className={`inline-block w-[9ch] text-xs ${tooLong ? 'text-red-400' : 'text-mist/50'}`}
                             title={tooLong ? '⚠️ 音訊 ≥ 15s，建議縮短' : 'TTS 長度'}>
                             台({a.audioDuration.toFixed(1)}s)
                           </span>
@@ -769,23 +788,52 @@ export default function VideoStoryboardPage() {
                           const ak = assetKey(chapter.chapter_index, sIdx, 'tai-lo')
                           const a = sceneAssets[ak]
                           if (!a || a.audioState === 'idle') return null
-                          if (a.audioState === 'loading') return <span className="text-yellow-400 text-xs animate-pulse" title="台語語音生成中">台⏳</span>
-                          if (a.audioState === 'error') return <span className="text-red-400 text-xs" title="台語語音失敗">台✗</span>
+                          if (a.audioState === 'loading') return <span className="inline-flex items-center justify-center min-w-[2.5ch] text-yellow-400 text-xs animate-pulse" title="台語語音生成中">台⏳</span>
+                          if (a.audioState === 'error') return <span className="inline-flex items-center justify-center min-w-[2.5ch] text-red-400 text-xs" title="台語語音失敗">台✗</span>
+                          return null
+                        })()}
+                        {(() => {
+                          const ik = assetKey(chapter.chapter_index, sIdx, 'tai-lo')
+                          const img = sceneAssets[ik]
+                          if (!img || img.imageState === 'idle') return null
+                          if (img.imageState === 'loading') return <span className="inline-flex items-center justify-center min-w-[2.5ch] text-yellow-400 text-xs animate-pulse" title="參考圖片生成中">🖼⏳</span>
+                          if (img.imageState === 'done') return (
+                            <span className="inline-flex items-center justify-center min-w-[2.5ch] text-green-400 text-xs cursor-pointer hover:scale-110 transition-transform"
+                              title="參考圖片完成 — 點擊預覽"
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                try {
+                                  const path = sceneRefImagePath(chapter.scenes[sIdx], chapter.chapter_index, sIdx)
+                                  const { url } = await refreshSignedUrl(id, path)
+                                  setReferenceImagePreview(url)
+                                } catch {}
+                              }}>
+                              🖼
+                            </span>
+                          )
+                          if (img.imageState === 'error') return <span className="inline-flex items-center justify-center min-w-[2.5ch] text-red-400 text-xs" title="參考圖片失敗">🖼✗</span>
                           return null
                         })()}
                         {(() => {
                           const vk = assetKey(chapter.chapter_index, sIdx, 'tai-lo')
                           const v = sceneAssets[vk]
                           if (!v || v.videoState === 'idle') return null
-                          if (v.videoState === 'loading') return <span className="text-yellow-400 text-xs animate-pulse" title="台語影片生成中">台🎬⏳</span>
+                          if (v.videoState === 'loading') return <span className="inline-flex items-center justify-center min-w-[2.5ch] text-yellow-400 text-xs animate-pulse" title="台語影片生成中">台🎬⏳</span>
                           if (v.videoState === 'done') return (
-                            <span className="text-green-400 text-xs cursor-pointer hover:scale-110 transition-transform"
+                            <span className="inline-flex items-center justify-center min-w-[2.5ch] text-green-400 text-xs cursor-pointer hover:scale-110 transition-transform"
                               title="台語影片完成 — 點擊預覽"
-                              onClick={e => { e.stopPropagation(); setSceneVideoPreview({ videoUrl: v.videoUrl, track: 'tai-lo' }) }}>
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                try {
+                                  const path = sceneVideoPath(chapter.scenes[sIdx], chapter.chapter_index, sIdx, 'tai-lo')
+                                  const { url } = await refreshSignedUrl(id, path)
+                                  setSceneVideoPreview({ videoUrl: url, track: 'tai-lo' })
+                                } catch {}
+                              }}>
                               台🎬
                             </span>
                           )
-                          if (v.videoState === 'error') return <span className="text-red-400 text-xs" title="台語影片失敗">台🎬✗</span>
+                          if (v.videoState === 'error') return <span className="inline-flex items-center justify-center min-w-[2.5ch] text-red-400 text-xs" title="台語影片失敗">台🎬✗</span>
                           return null
                         })()}
                       </div>
@@ -823,7 +871,7 @@ export default function VideoStoryboardPage() {
                             ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}}
                             onChange={e => { updateScene(chapter.chapter_index, sIdx, 'visual_prompt', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                             className="flex-1 rounded bg-[#1e293b] border border-white/10 text-paper text-sm px-3 py-2 focus:outline-none focus:border-gold resize-none overflow-hidden font-mono text-xs" />
-                          <button onClick={() => handleSceneRegeneratePrompt(chapter.chapter_index, sIdx)}
+                          <button onClick={() => setRegenerateModal({ chIdx: chapter.chapter_index, sIdx })}
                             className="shrink-0 self-start px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-paper hover:bg-white/20 transition-colors"
                             title="用 AI 重新生成視覺提示">
                             🔄
@@ -848,7 +896,7 @@ export default function VideoStoryboardPage() {
                                   {a.audioState === 'loading' ? '⏳' : a.audioUrl ? '🔊 台語 重新' : '🔊 台語'}
                                 </button>
                                 {a.audioUrl && (
-                                  <audio controls src={a.audioUrl} preload="none" className="h-8 w-28" />
+                                  <LazyAudio orderId={id} path={sceneAudioPath(scene, chapter.chapter_index, sIdx, 'tai-lo')} />
                                 )}
                               </>
                             )
@@ -870,7 +918,13 @@ export default function VideoStoryboardPage() {
                                   {i.imageState === 'loading' ? '⏳' : i.imageUrl ? '🖼 重新參考' : '🖼 參考圖片'}
                                 </button>
                                 {i.imageUrl && (
-                                  <button onClick={() => setReferenceImagePreview(i.imageUrl)}
+                                  <button onClick={async () => {
+                                    try {
+                                      const path = sceneRefImagePath(chapter.scenes[sIdx], chapter.chapter_index, sIdx)
+                                      const { url } = await refreshSignedUrl(id, path)
+                                      setReferenceImagePreview(url)
+                                    } catch {}
+                                  }}
                                     className="w-7 h-7 rounded-full bg-white/10 text-paper border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors text-xs"
                                     title="預覽參考圖片">👁</button>
                                 )}
@@ -897,7 +951,13 @@ export default function VideoStoryboardPage() {
                                   {v.videoState === 'loading' ? '⏳' : v.videoUrl ? '🎬 台語 重新' : '🎬 台語 影片'}
                                 </button>
                                 {v.videoUrl && (
-                                  <button onClick={() => setSceneVideoPreview({ videoUrl: v.videoUrl, track: 'tai-lo' })}
+                                  <button onClick={async () => {
+                                    try {
+                                      const path = sceneVideoPath(chapter.scenes[sIdx], chapter.chapter_index, sIdx, 'tai-lo')
+                                      const { url } = await refreshSignedUrl(id, path)
+                                      setSceneVideoPreview({ videoUrl: url, track: 'tai-lo' })
+                                    } catch {}
+                                  }}
                                     className="w-7 h-7 rounded-full bg-green-900/40 text-green-300 border border-green-700/30 flex items-center justify-center hover:bg-green-800/40 transition-colors text-xs"
                                     title="預覽場景影片">▶</button>
                                 )}
@@ -957,8 +1017,7 @@ export default function VideoStoryboardPage() {
 
       {/* Video viewer modal */}
       {videoViewerChapter !== null && (() => {
-        const vk = `${videoViewerChapter.chIdx}_${videoViewerChapter.track}`
-        return chapterVideoUrls[vk] ? (
+        return videoViewerChapter.videoUrl ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
             onClick={() => setVideoViewerChapter(null)}>
             <div className="relative max-w-3xl w-full" onClick={e => e.stopPropagation()}>
@@ -969,10 +1028,10 @@ export default function VideoStoryboardPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-mist">{TRACK_LABELS[videoViewerChapter.track]}</span>
                 <video controls autoPlay className="w-full rounded-lg shadow-2xl"
-                  src={chapterVideoUrls[vk]} />
+                  src={videoViewerChapter.videoUrl} />
               </div>
-              {chapterSrtUrls[vk] && (
-                <a href={chapterSrtUrls[vk]} download
+              {videoViewerChapter.srtUrl && (
+                <a href={videoViewerChapter.srtUrl} download
                   className="inline-block px-3 py-1 text-xs text-white/70 hover:text-white bg-white/10 rounded transition-colors no-underline"
                   target="_blank" rel="noopener noreferrer">
                   下載字幕 (.srt)
@@ -1017,6 +1076,108 @@ export default function VideoStoryboardPage() {
           </div>
         </div>
       )}
+
+      {/* Regenerate prompt modal */}
+      {regenerateModal && (() => {
+        const { chIdx, sIdx } = regenerateModal
+        const psKey = `${chIdx}_${sIdx}`
+        const ps = scenePromptSettings[psKey] || { hint: '', cameraDistance: 'medium', cameraAngle: 'front' }
+        const wordCount = ps.hint.trim() ? ps.hint.trim().split(/\s+/).length : 0
+        const overLimit = wordCount > 100
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={() => setRegenerateModal(null)}>
+            <div className="relative max-w-md w-full bg-[#1e293b] border border-white/10 rounded-xl p-6"
+              onClick={e => e.stopPropagation()}>
+              <h3 className="text-base font-semibold text-paper mb-3">進階提示設定</h3>
+              <p className="text-xs text-mist mb-4">
+                設定攝影參數與提示文字，引導 AI 重新生成視覺提示。
+              </p>
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="text-xs text-mist block mb-1">
+                    使用者提示 (最多 100 字) {ps.hint ? `— ${wordCount}/100` : ''}
+                  </label>
+                  <textarea value={ps.hint}
+                    onChange={e => {
+                      const val = e.target.value
+                      setScenePromptSettings(prev => ({
+                        ...prev,
+                        [psKey]: { ...ps, hint: val },
+                      }))
+                    }}
+                    className={`w-full rounded bg-[#0f172a] border text-sm px-3 py-2 focus:outline-none resize-none ${overLimit ? 'border-red-400' : 'border-white/10 focus:border-gold'}`}
+                    rows={2}
+                    placeholder="輸入關鍵字或描述，引導 AI 生成視覺提示…" />
+                  {overLimit && <p className="text-red-400 text-xs mt-0.5">超過 100 字的限制</p>}
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-mist block mb-1">攝影距離</label>
+                    <select value={ps.cameraDistance}
+                      onChange={e => setScenePromptSettings(prev => ({ ...prev, [psKey]: { ...ps, cameraDistance: e.target.value } }))}
+                      className="w-full rounded bg-[#0f172a] border border-white/10 text-paper text-xs px-2 py-1.5 focus:outline-none focus:border-gold">
+                      <option value="close-up">特寫 (Close-up)</option>
+                      <option value="medium">中景 (Medium)</option>
+                      <option value="wide">全景 (Wide)</option>
+                      <option value="long-shot">遠景 (Long shot)</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-mist block mb-1">攝影角度</label>
+                    <select value={ps.cameraAngle}
+                      onChange={e => setScenePromptSettings(prev => ({ ...prev, [psKey]: { ...ps, cameraAngle: e.target.value } }))}
+                      className="w-full rounded bg-[#0f172a] border border-white/10 text-paper text-xs px-2 py-1.5 focus:outline-none focus:border-gold">
+                      <option value="front">正面 (Front)</option>
+                      <option value="side">側面 (Side)</option>
+                      <option value="high-angle">俯視 (High angle)</option>
+                      <option value="low-angle">仰視 (Low angle)</option>
+                      <option value="back">背面 (Back)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setRegenerateModal(null)}
+                  className="px-4 py-2 rounded-lg border border-white/20 text-paper text-xs hover:bg-white/10 transition-colors">
+                  取消
+                </button>
+                <button onClick={async () => {
+                  setRegenerateModal(null)
+                  try {
+                    const parts: string[] = []
+                    if (ps.cameraDistance || ps.cameraAngle) {
+                      parts.push(`Camera: ${ps.cameraDistance}, ${ps.cameraAngle}`)
+                    }
+                    if (ps.hint.trim()) {
+                      const words = ps.hint.trim().split(/\s+/)
+                      const truncated = words.length > 100 ? words.slice(0, 100).join(' ') : ps.hint.trim()
+                      parts.push(`Additional context: ${truncated}`)
+                    }
+                    const instruction = parts.join('. ') || undefined
+                    const r = await adminSceneRegeneratePrompt(id, chIdx, sIdx, instruction)
+                    setMaterials(prev => {
+                      if (!prev) return prev
+                      const updated = { ...prev, chapters: [...prev.chapters] }
+                      const ch = { ...updated.chapters[chIdx] }
+                      ch.scenes = [...ch.scenes]
+                      ch.scenes[sIdx] = { ...ch.scenes[sIdx], visual_prompt: r.visual_prompt }
+                      updated.chapters[chIdx] = ch
+                      return updated
+                    })
+                    setMessage('視覺提示已重新生成')
+                  } catch (e: unknown) {
+                    setMessage(`重新生成失敗：${e instanceof Error ? e.message : 'unknown'}`)
+                  }
+                }}
+                  className="px-4 py-2 rounded-lg bg-gold text-black text-xs font-medium hover:opacity-90 transition-opacity">
+                  生成提示
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Clean confirmation modal */}
       {cleanModal.show && (
@@ -1109,6 +1270,31 @@ export default function VideoStoryboardPage() {
   )
 }
 
+
+function LazyAudio({ orderId, path }: { orderId: string; path: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  if (url) {
+    return <audio controls src={url} preload="none" className="h-8 w-28" />
+  }
+
+  return (
+    <button onClick={async () => {
+      if (loading) return
+      setLoading(true)
+      try {
+        const r = await refreshSignedUrl(orderId, path)
+        setUrl(r.url)
+      } finally {
+        setLoading(false)
+      }
+    }} disabled={loading}
+      className="px-2 py-1 rounded text-xs bg-white/10 text-paper hover:bg-white/20 transition-colors disabled:opacity-40 min-w-[5rem] text-center">
+      {loading ? '⏳' : '▶ 載入'}
+    </button>
+  )
+}
 
 function SrtVerifierModal({ videoUrl, entries, onClose }: {
   videoUrl: string

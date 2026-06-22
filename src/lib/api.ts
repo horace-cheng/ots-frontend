@@ -317,6 +317,9 @@ export const adminSceneRegeneratePrompt = (
     { chapter_index, scene_index, instruction }
   )
 
+export const refreshSignedUrl = (orderId: string, path: string) =>
+  request<{ url: string }>('POST', `/admin/orders/${orderId}/video-materials/refresh-signed-url`, { path })
+
 export const adminChapterAssemble = (
   orderId: string,
   chapter_index: number,

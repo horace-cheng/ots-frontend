@@ -10,9 +10,9 @@ export function ApiLoadingIndicator() {
   if (!loading) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-3 bg-ink/90 backdrop-blur-sm px-4 py-2 text-sm text-paper border-b border-gold/30 fade-down">
-      <div className="spinner !w-3.5 !h-3.5 !border-white/20 !border-t-gold shrink-0" />
-      Waiting for response…
+    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-3 bg-ink/95 backdrop-blur-md px-5 py-3 text-base text-paper border-b border-gold/50 shadow-lg shadow-ink/50 fade-down">
+      <div className="spinner !w-4 !h-4 !border-white/20 !border-t-gold shrink-0" />
+      <span>等待伺服器回應…</span>
     </div>
   )
 }
