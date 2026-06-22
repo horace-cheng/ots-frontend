@@ -1,6 +1,6 @@
 'use client'
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { Fragment, useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -222,6 +222,79 @@ export default function VideoStoryboardPage() {
   function toggleScene(chIdx: number, sIdx: number) {
     const key = `${chIdx}_${sIdx}`
     setExpandedScenes(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function addScene(chIdx: number, afterIdx: number) {
+    const newScene: VideoScene = {
+      scene_id: crypto.randomUUID(),
+      scene_index: afterIdx + 1,
+      visual_prompt: '',
+      duration_est: '',
+      tracks: {
+        'tai-lo': { narration_text: '' },
+        zh: { narration_text: '' },
+      },
+    }
+    setMaterials(prev => {
+      if (!prev) return prev
+      const chapters = prev.chapters.map((ch, ci) => {
+        if (ci !== chIdx) return ch
+        const scenes = [...ch.scenes]
+        scenes.splice(afterIdx + 1, 0, newScene)
+        return { ...ch, scenes: scenes.map((s, i) => ({ ...s, scene_index: i })) }
+      })
+      return { ...prev, chapters }
+    })
+    setExpandedScenes(prev => ({ ...prev, [`${chIdx}_${afterIdx + 1}`]: true }))
+    setSceneAssets(prev => {
+      const next: SceneAssets = {}
+      for (const [k, v] of Object.entries(prev)) {
+        const parts = k.split('_')
+        const ch = parseInt(parts[0], 10)
+        if (ch !== chIdx) { next[k] = v; continue }
+        const sc = parseInt(parts[1], 10)
+        if (sc <= afterIdx) { next[k] = v; continue }
+        next[`${chIdx}_${sc + 1}_${parts.slice(2).join('_')}`] = v
+      }
+      return next
+    })
+  }
+
+  function removeScene(chIdx: number, sIdx: number) {
+    if (!confirm(`確定刪除場景 ${sIdx + 1}？`)) return
+    setMaterials(prev => {
+      if (!prev) return prev
+      const chapters = prev.chapters.map((ch, ci) => {
+        if (ci !== chIdx) return ch
+        const scenes = ch.scenes.filter((_, i) => i !== sIdx)
+        return { ...ch, scenes: scenes.map((s, i) => ({ ...s, scene_index: i })) }
+      })
+      return { ...prev, chapters }
+    })
+    setExpandedScenes(prev => {
+      const next: Record<string, boolean> = {}
+      for (const [k, v] of Object.entries(prev)) {
+        const [ch, sc] = k.split('_').map(Number)
+        if (ch !== chIdx) { next[k] = v; continue }
+        if (sc < sIdx) { next[k] = v; continue }
+        if (sc === sIdx) continue
+        if (sc > sIdx) { next[`${ch}_${sc - 1}`] = v }
+      }
+      return next
+    })
+    setSceneAssets(prev => {
+      const next: SceneAssets = {}
+      for (const [k, v] of Object.entries(prev)) {
+        const parts = k.split('_')
+        const ch = parseInt(parts[0], 10)
+        if (ch !== chIdx) { next[k] = v; continue }
+        const sc = parseInt(parts[1], 10)
+        if (sc < sIdx) { next[k] = v; continue }
+        if (sc === sIdx) continue
+        next[`${chIdx}_${sc - 1}_${parts.slice(2).join('_')}`] = v
+      }
+      return next
+    })
   }
 
   const handleSceneTts = useCallback(async (chIdx: number, sIdx: number, track: Track) => {
@@ -661,21 +734,24 @@ export default function VideoStoryboardPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-1">
             {chapter.scenes.map((scene: VideoScene, sIdx: number) => {
               const isExpanded = expandedScenes[`${chapter.chapter_index}_${sIdx}`] ?? false
 
               return (
-                <div key={scene.scene_index}
+                <Fragment key={sIdx}>
+                <div
                   className="rounded-lg border border-white/5 bg-white/[0.03] overflow-hidden">
                   {/* Scene header */}
                   <div className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors"
                     onClick={() => toggleScene(chapter.chapter_index, sIdx)}>
                     <div className="flex items-center gap-2">
+                      <button onClick={e => { e.stopPropagation(); removeScene(chapter.chapter_index, sIdx) }}
+                        className="text-mist/20 hover:text-red-400 transition-colors text-xs leading-none pr-1"
+                        title="刪除場景">🗑</button>
                       <span className="text-xs font-medium text-mist">
                         Scene {scene.scene_index + 1}
                       </span>
-                      <span className="text-xs text-mist/60">{scene.duration_est}</span>
                       {(() => {
                         const ak = assetKey(chapter.chapter_index, sIdx, 'tai-lo')
                         const a = sceneAssets[ak]
@@ -853,6 +929,13 @@ export default function VideoStoryboardPage() {
                     </div>
                   )}
                 </div>
+                <div className="h-4 flex items-center justify-center group cursor-pointer"
+                  onClick={() => addScene(chapter.chapter_index, sIdx)}>
+                  <div className="w-5 h-5 rounded-full bg-[#1e293b] border border-gold/40 flex items-center justify-center text-gold text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    ＋
+                  </div>
+                </div>
+              </Fragment>
               )
             })}
           </div>

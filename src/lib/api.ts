@@ -876,6 +876,7 @@ export interface VideoSceneTrack {
 
 export interface VideoScene {
   scene_index:    number
+  scene_id?:      string       // stable UUID for asset paths (survives re-indexing)
   narration_text?: string       // legacy flat field (pre-dual-track files)
   visual_prompt:  string
   duration_est:   string
